@@ -1260,9 +1260,27 @@ def run_recurring():
     conn.close()
     return jsonify({'created': created, 'message': f'{created} tareas recurrentes creadas'})
 
+_db_init_error = None
+
+@app.route('/api/db-status')
+def db_status():
+    return jsonify({
+        'engine': 'postgresql' if os.environ.get('DATABASE_URL', '').startswith('postgresql') else 'sqlite',
+        'init_error': _db_init_error
+    })
+
 if __name__ == '__main__':
     print("Inicializando base de datos...")
-    init_db()
+    try:
+        init_db()
+    except Exception as e:
+        _db_init_error = str(e)
+        print(f"ERROR iniciando DB: {e}")
+        import traceback
+        traceback.print_exc()
+        os.environ.pop('DATABASE_URL', None)
+        print("Fallback a SQLite...")
+        init_db()
 
     print("Inicializando agentes IA...")
     initialize_agents()
