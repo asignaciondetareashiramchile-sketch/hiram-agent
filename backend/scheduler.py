@@ -1,14 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from database import get_db
-from email_service import send_task_reminder
+from email_service import send_task_reminder, send_task_overdue_alert
 from agent_service import generate_ai_suggestions, generate_marketing_suggestions, generate_task_followups, initialize_agents
 
 def daily_reminder_job():
     print(f"[{datetime.now()}] Ejecutando recordatorio diario de tareas...")
     conn = get_db()
-    cursor = conn.cursor()
 
-    pending = cursor.execute('''
+    pending = conn.execute('''
         SELECT t.*, a.name as area_name, a.email as area_email, c.name as company_name
         FROM tasks t
         JOIN areas a ON t.area_id = a.id
@@ -35,10 +34,9 @@ def agent_suggestion_job():
     suggestions = generate_ai_suggestions()
 
     conn = get_db()
-    cursor = conn.cursor()
 
     for sug in suggestions:
-        cursor.execute('''
+        conn.execute('''
             INSERT INTO tasks (area_id, company_id, title, description, priority, status, created_by)
             VALUES (
                 (SELECT id FROM areas WHERE name = ?),
@@ -47,7 +45,8 @@ def agent_suggestion_job():
             )
         ''', (sug['area'], sug['company'], f"[SUGERIDO] {sug['title']}", sug['description'], sug['priority']))
 
-        task_id = cursor.lastrowid
+        from database import last_insert_id
+        task_id = last_insert_id(conn)
         from email_service import send_agent_suggestion
         send_agent_suggestion({
             'id': task_id,
@@ -102,7 +101,6 @@ def recurring_tasks_job():
             except:
                 should_create = True
         if should_create:
-            from datetime import timedelta
             due_date = (datetime.now() + timedelta(days=3)).strftime('%Y-%m-%d')
             conn.execute('''
                 INSERT INTO tasks (area_id, company_id, title, description, priority, due_date, created_by, template_id)
@@ -113,6 +111,52 @@ def recurring_tasks_job():
     conn.commit()
     conn.close()
     print(f"Tareas recurrentes creadas: {created}")
+
+def overdue_check_job():
+    print(f"[{datetime.now()}] Revisando tareas vencidas...")
+    conn = get_db()
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    today_str = datetime.now().strftime('%Y-%m-%d')
+
+    overdue = conn.execute('''
+        SELECT t.*, a.name as area_name, a.email as area_email, c.name as company_name
+        FROM tasks t
+        JOIN areas a ON t.area_id = a.id
+        JOIN companies c ON t.company_id = c.id
+        WHERE t.status IN ('pendiente', 'gestionando')
+        AND t.due_date < ?
+    ''', (today_str,)).fetchall()
+
+    from app import socketio, create_notification
+    notified = 0
+    for task in overdue:
+        task_id = task['id']
+        check = conn.execute(
+            "SELECT COUNT(*) as c FROM task_logs WHERE task_id = ? AND action = 'overdue_alert' AND date(created_at) = ?",
+            (task_id, today_str)
+        ).fetchone()
+        if check['c'] == 0:
+            due = task.get('due_date')
+            days_overdue = 0
+            if due:
+                try:
+                    due_date = datetime.strptime(str(due)[:10], '%Y-%m-%d')
+                    days_overdue = (datetime.now() - due_date).days
+                except:
+                    pass
+            send_task_overdue_alert(dict(task), task['area_email'], task['area_name'], task['company_name'], days_overdue)
+            create_notification(None, task['area_id'], f'⚠️ Tarea vencida: {task["title"]}',
+                              f'Lleva {days_overdue} día(s) de atraso', 'overdue', f'/?area_id={task["area_id"]}')
+            conn.execute(
+                "INSERT INTO task_logs (task_id, action, detail) VALUES (?, 'overdue_alert', ?)",
+                (task_id, f'Alerta de vencimiento enviada - {days_overdue} día(s) de atraso')
+            )
+            socketio.emit('task_overdue', {'task_id': task_id, 'title': task['title'], 'days_overdue': days_overdue, 'area_id': task['area_id']}, room='dashboard')
+            notified += 1
+
+    conn.commit()
+    conn.close()
+    print(f"Alertas de vencimiento: {notified} enviadas, {len(overdue)} vencidas total")
 
 def start_scheduler(app):
     from apscheduler.schedulers.background import BackgroundScheduler
@@ -175,6 +219,15 @@ def start_scheduler(app):
         replace_existing=True
     )
 
+    scheduler.add_job(
+        func=overdue_check_job,
+        trigger='interval',
+        hours=1,
+        id='overdue_check',
+        name='Revisar tareas vencidas',
+        replace_existing=True
+    )
+
     scheduler.start()
     print("="*60)
     print("📋 PLANIFICADOR DE AGENTES IA INICIADO")
@@ -184,5 +237,6 @@ def start_scheduler(app):
     print("🎨 Cada 4h  - Sugerencias de Marketing")
     print("📊 Cada 3h  - Seguimiento de tareas")
     print("🔄 06:00 - Tareas recurrentes (plantillas)")
+    print("⚠️ Cada 1h - Revisión de tareas vencidas")
     print("="*60)
     return scheduler

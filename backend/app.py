@@ -258,10 +258,7 @@ def create_task():
         conn.close()
         return jsonify({'error': 'Área o empresa no encontrada'}), 404
 
-    due_date = calculate_due_date(data.get('priority', 'media'))
-    # la creación es correcta. 
-    # Ahora: insertar la tarea con título, descripción, prioridad...
-    # Generar due_date...
+    due_date = data.get('due_date') or calculate_due_date(data.get('priority', 'media'))
     conn.execute('''
         INSERT INTO tasks (area_id, company_id, title, description, priority, due_date, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?)

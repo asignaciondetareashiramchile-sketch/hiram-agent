@@ -266,6 +266,14 @@ async function loadAgentStatus() {
 }
 
 // ===== TASK MODAL =====
+function calcDueDate(priority) {
+    const now = new Date();
+    const hours = { urgente: 3, alta: 8, media: 72, baja: 120 };
+    const h = hours[priority] || 72;
+    const due = new Date(now.getTime() + h * 3600000);
+    return due.toISOString().split('T')[0];
+}
+
 function openTaskModal(areaId, areaName, areaEmail) {
     document.getElementById('modal-area-id').value = areaId;
     document.getElementById('modal-area-name').textContent = `Área: ${areaName}`;
@@ -274,6 +282,7 @@ function openTaskModal(areaId, areaName, areaEmail) {
     document.getElementById('task-title').value = '';
     document.getElementById('task-desc').value = '';
     document.getElementById('task-files').value = '';
+    document.getElementById('task-due').value = calcDueDate('media');
     if (selectedCompanyId) document.getElementById('modal-company').value = selectedCompanyId;
     document.getElementById('task-modal').style.display = 'flex';
     document.getElementById('task-modal').style.animation = 'fadeIn 0.2s ease';
@@ -284,6 +293,7 @@ function closeTaskModal() { document.getElementById('task-modal').style.display 
 function selectPriority(element, priority) {
     document.querySelectorAll('.priority-btn').forEach(b => b.classList.remove('selected'));
     element.classList.add('selected');
+    document.getElementById('task-due').value = calcDueDate(priority);
 }
 
 async function submitTask() {
@@ -298,9 +308,10 @@ async function submitTask() {
     if (!areaId || !title) { showNotification('Debes completar el título de la tarea', 'error'); return; }
     if (!companyId) { showNotification('Debes seleccionar una empresa', 'error'); return; }
 
+    const dueDate = document.getElementById('task-due').value;
     const result = await fetchAPI('/tasks', {
         method: 'POST',
-        body: JSON.stringify({ area_id: parseInt(areaId), company_id: companyId, title, description, priority })
+        body: JSON.stringify({ area_id: parseInt(areaId), company_id: companyId, title, description, priority, due_date: dueDate })
     });
 
     if (result) {
@@ -360,8 +371,23 @@ async function loadAreaTasks(areaId) {
     tasks.forEach(task => { container.appendChild(createTaskCard(task)); });
 }
 
+function getTaskColor(task) {
+    if (task.status === 'realizada' || task.status === 'cancelada') return '#28A745';
+    if (!task.due_date) return PRIORITIES[task.priority]?.color || '#666';
+    const now = new Date();
+    const due = new Date(task.due_date + 'T23:59:59');
+    const diffMs = due - now;
+    const diffHours = diffMs / 3600000;
+    if (diffHours < 0) return '#DC3545';
+    if (diffHours < 3) return '#7B2D8E';
+    if (diffHours < 24) return '#DC3545';
+    if (diffHours < 72) return '#FFC107';
+    return '#28A745';
+}
+
 function createTaskCard(task, compact = false) {
     const priority = PRIORITIES[task.priority] || { label: 'N/A', color: '#666', icon: '⚪' };
+    const dynamicColor = getTaskColor(task);
     const companyColor = COMPANY_COLORS[task.company_name] || '#666';
     const statusLabels = { pendiente: '⏳ Pendiente', gestionando: '🔄 Gestionando', realizada: '✅ Realizada', cancelada: '❌ Cancelada' };
     const statusColors = { pendiente: '#FFC107', gestionando: '#1a73e8', realizada: '#28A745', cancelada: '#DC3545' };
@@ -373,15 +399,15 @@ function createTaskCard(task, compact = false) {
     card.dataset.status = task.status;
 
     if (compact) {
-        card.innerHTML = `<div class="task-priority" style="background:${priority.color};width:4px;"></div>
+        card.innerHTML = `<div class="task-priority" style="background:${dynamicColor};width:4px;"></div>
             <div class="task-content"><div class="task-title" style="font-size:13px;">${task.title}</div>
-            <div class="task-meta" style="font-size:10px;"><span style="color:${priority.color}">${priority.icon} ${priority.label}</span>
+            <div class="task-meta" style="font-size:10px;"><span style="color:${dynamicColor}">${priority.icon} ${priority.label}</span>
             ${task.due_date ? `<span>📅 ${task.due_date}</span>` : ''}</div></div>`;
         return card;
     }
 
     card.innerHTML = `
-        <div class="task-priority" style="background:${priority.color}"></div>
+        <div class="task-priority" style="background:${dynamicColor}"></div>
         <div class="task-content">
             <div class="task-header">
                 <span class="task-company" style="color:${companyColor};border-color:${companyColor}">${task.company_name}</span>
@@ -390,8 +416,8 @@ function createTaskCard(task, compact = false) {
             <div class="task-title">${task.title}</div>
             ${task.description ? `<div class="task-desc">${task.description}</div>` : ''}
             <div class="task-meta">
-                <span style="color:${priority.color}">${priority.icon} ${priority.label}</span>
-                <span>📅 Límite: ${task.due_date || 'N/A'}</span>
+                <span style="color:${dynamicColor}">${priority.icon} ${priority.label}</span>
+                <span>📅 Límite: ${task.due_date || 'N/A'}${task.due_date && task.status !== 'realizada' && task.status !== 'cancelada' && new Date(task.due_date + 'T23:59:59') < new Date() ? ' ⚠️ VENCIDA' : ''}</span>
                 <span>🕐 ${task.created_at || ''}</span>
             </div>
             <div class="task-actions">
