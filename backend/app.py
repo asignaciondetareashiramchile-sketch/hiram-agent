@@ -397,7 +397,7 @@ def update_task(task_id):
 @role_required('superadmin', 'admin')
 def delete_task(task_id):
     conn = get_db()
-    conn.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
+    conn.execute('DELETE FROM task_logs WHERE task_id = ?', (task_id,))
     conn.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
     conn.commit()
     conn.close()
