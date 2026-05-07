@@ -480,7 +480,7 @@ def _init_sqlite():
 
 def _init_pg():
     conn = get_db()
-    cur = conn._conn
+    cur = conn.cursor()
 
     tables = [
         '''

@@ -1279,6 +1279,9 @@ if __name__ == '__main__':
         import traceback
         traceback.print_exc()
         os.environ.pop('DATABASE_URL', None)
+        from database import _engine
+        import database
+        database._engine = None
         print("Fallback a SQLite...")
         init_db()
 
