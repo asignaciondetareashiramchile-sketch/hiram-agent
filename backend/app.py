@@ -405,22 +405,6 @@ def delete_task(task_id):
     socketio.emit('stats_update', {}, room='dashboard')
     return jsonify({'message': 'Tarea eliminada'})
 
-
-@app.route('/api/cleanup/templates', methods=['POST'])
-@login_required
-@role_required('superadmin')
-def cleanup_templates():
-    conn = get_db()
-    conn.execute('''DELETE FROM templates WHERE id NOT IN (
-        SELECT MIN(id) FROM templates GROUP BY area_id, title
-    )''')
-    conn.commit()
-    remaining = conn.execute('SELECT COUNT(*) FROM templates').fetchone()[0]
-    conn.close()
-    socketio.emit('stats_update', {}, room='dashboard')
-    return jsonify({'message': f'Plantillas duplicadas eliminadas, quedan {remaining}'})
-
-
 # ===== ATTACHMENTS =====
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'zip'}
