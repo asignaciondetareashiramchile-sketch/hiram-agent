@@ -19,7 +19,7 @@ const COMPANY_COLORS = {
 };
 
 let areas = [], companies = [], currentView = 'dashboard', currentAreaId = null, selectedCompanyId = null;
-let kanbanMode = false, notifTimer = null;
+let kanbanMode = false, notifTimer = null, user = null;
 
 async function fetchAPI(url, options = {}) {
     try {
@@ -52,7 +52,7 @@ if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('da
 
 // ===== AUTH =====
 async function loadUser() {
-    const user = await fetchAPI('/auth/me');
+    user = await fetchAPI('/auth/me');
     if (!user) return;
     document.getElementById('user-name').textContent = user.name || user.username;
     document.getElementById('header-user').textContent = `👤 ${user.name || user.username} · ${user.role === 'superadmin' ? 'Admin' : user.role === 'admin' ? 'Admin' : 'Área'}`;
@@ -402,6 +402,7 @@ function createTaskCard(task, compact = false) {
                 ${task.id ? `<button class="btn-sm" style="background:#f0f0f0;" onclick="showAttachments(${task.id})">📎 Archivos</button>` : ''}
                 ${task.status === 'realizada' && !task.approved_at ? `<button class="btn-sm" style="background:#D4EDDA;color:#155724;" onclick="approveTask(${task.id})">✍️ Aprobar</button>` : ''}
                 ${task.status === 'realizada' && task.approved_at ? `<span style="font-size:11px;color:#28A745;font-weight:600;">✅ Aprobada</span>` : ''}
+                ${(user?.role === 'superadmin' || user?.role === 'admin') ? `<button class="btn-sm btn-delete" onclick="deleteTask(${task.id})" style="background:#f8d7da;color:#721c24;">🗑 Eliminar</button>` : ''}
             </div>
         </div>`;
     return card;
@@ -432,6 +433,16 @@ async function updateTaskStatus(taskId, status) {
 async function sendReminder(taskId) {
     const result = await fetchAPI(`/send-reminder/${taskId}`, { method: 'GET' });
     if (result) showNotification('📧 Recordatorio enviado al área', 'info');
+}
+
+async function deleteTask(taskId) {
+    if (!confirm('¿Estás seguro de eliminar esta tarea? Esta acción no se puede deshacer.')) return;
+    const result = await fetchAPI(`/tasks/${taskId}`, { method: 'DELETE' });
+    if (result) {
+        showNotification('🗑 Tarea eliminada', 'success');
+        if (currentAreaId) { loadAreaTasks(currentAreaId); if (kanbanMode) loadKanban(currentAreaId); }
+        loadDashboard();
+    }
 }
 
 function filterTasks() { if (currentAreaId) loadAreaTasks(currentAreaId); }
