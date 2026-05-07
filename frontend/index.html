@@ -130,6 +130,24 @@
                 </div>
                 <div id="activity-feed" style="background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;padding:8px 0;"></div>
             </section>
+
+            <section id="marketing-section" class="agent-section">
+                <div class="section-header">
+                    <h2>🎨 Ideas de Marketing</h2>
+                    <p class="section-desc">Sugerencias generadas por el agente IA de marketing</p>
+                </div>
+                <div id="marketing-ideas" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+                    <p style="color:#999;text-align:center;padding:20px;">Esperando sugerencias del agente...</p>
+                </div>
+            </section>
+
+            <section id="ranking-section" class="agent-section">
+                <div class="section-header">
+                    <h2>🏆 Rendimiento por Área</h2>
+                    <p class="section-desc">Ranking de cumplimiento de tareas por área</p>
+                </div>
+                <div id="ranking-grid"></div>
+            </section>
         </div>
 
         <div id="area-tasks-view" style="display:none;">
@@ -269,6 +287,39 @@
                     <input type="number" id="tmpl-days" class="form-input" value="30" min="1">
                 </div>
                 <button class="btn-submit" onclick="saveTemplate()">💾 Guardar Plantilla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Area Chat Widget -->
+    <button id="area-chat-toggle" onclick="toggleAreaChat()" title="Chat por área">
+        💬 <span class="badge" id="area-chat-badge" style="display:none;">0</span>
+    </button>
+    <div id="area-chat-panel">
+        <div class="area-chat-header">
+            <select id="area-chat-select" onchange="switchAreaChat()">
+                <option value="">Seleccionar área...</option>
+            </select>
+            <button class="close-chat" onclick="toggleAreaChat()">&times;</button>
+        </div>
+        <div id="area-chat-messages">
+            <div style="text-align:center;color:#999;padding:40px;font-size:13px;" id="area-chat-empty">
+                💬 Selecciona un área para iniciar el chat
+            </div>
+        </div>
+        <div class="area-chat-footer">
+            <div class="chat-controls">
+                <select id="area-chat-company"><option value="">Empresa...</option></select>
+                <div class="urgency-picker" id="area-chat-urgency">
+                    <button style="background:#7B2D8E;" data-color="#7B2D8E" onclick="selectChatUrgency(this)"></button>
+                    <button style="background:#DC3545;" data-color="#DC3545" onclick="selectChatUrgency(this)"></button>
+                    <button style="background:#FFC107;" data-color="#FFC107" onclick="selectChatUrgency(this)" class="selected"></button>
+                    <button style="background:#28A745;" data-color="#28A745" onclick="selectChatUrgency(this)"></button>
+                </div>
+            </div>
+            <div class="chat-input-row">
+                <input type="text" id="area-chat-input" placeholder="Escribe un mensaje..." onkeydown="if(event.key==='Enter')sendAreaChat()">
+                <button onclick="sendAreaChat()">Enviar</button>
             </div>
         </div>
     </div>

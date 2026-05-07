@@ -155,6 +155,10 @@ function connectDashboardSocket() {
     dashboardSocket.on('notification', (data) => {
         loadNotifCount();
     });
+    dashboardSocket.on('task_overdue', (data) => {
+        showNotification(`⚠️ Tarea vencida: ${data.title} (${data.days_overdue} día(s))`, 'error');
+        loadDashboard();
+    });
 }
 
 // ===== AREAS =====
@@ -468,6 +472,8 @@ async function deleteTask(taskId) {
         showNotification('🗑 Tarea eliminada', 'success');
         if (currentAreaId) { loadAreaTasks(currentAreaId); if (kanbanMode) loadKanban(currentAreaId); }
         loadDashboard();
+    } else {
+        showNotification('Error al eliminar la tarea. Verifica la conexión.', 'error');
     }
 }
 
@@ -887,12 +893,192 @@ async function runRecurring() {
     if (result) showNotification(`🔄 ${result.created} tareas recurrentes creadas`, 'success');
 }
 
-// ===== CALENDAR LOAD =====
-// Extend loadDashboard to include calendar
+// ===== AREA CHAT =====
+let areaChatSocket = null;
+let currentChatAreaId = null;
+let chatUrgencyColor = '#FFC107';
+let areaChatMessages = {};
+
+function initAreaChat() {
+    areaChatSocket = io({ transports: ['websocket', 'polling'] });
+    areaChatSocket.on('area_chat_message', (msg) => {
+        if (msg.area_id == currentChatAreaId) {
+            appendChatMessage(msg);
+        }
+        // Update badge count for non-active chats
+        updateChatBadge();
+    });
+    loadChatAreas();
+}
+
+function loadChatAreas() {
+    const sel = document.getElementById('area-chat-select');
+    const companySel = document.getElementById('area-chat-company');
+    sel.innerHTML = '<option value="">Seleccionar área...</option>';
+    areas.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.id; opt.textContent = `${AREA_ICONS[a.name] || '📋'} ${a.name}`;
+        sel.appendChild(opt);
+    });
+    // If area user, auto-select their area
+    if (user?.role === 'area' && user?.area_id) {
+        sel.value = user.area_id;
+        switchAreaChat();
+    }
+    companySel.innerHTML = '<option value="">Empresa...</option>';
+    companies.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name;
+        companySel.appendChild(opt);
+    });
+}
+
+function toggleAreaChat() {
+    const panel = document.getElementById('area-chat-panel');
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open') && currentChatAreaId) {
+        setTimeout(() => {
+            document.getElementById('area-chat-messages').scrollTop = 99999;
+        }, 100);
+    }
+}
+
+function switchAreaChat() {
+    const sel = document.getElementById('area-chat-select');
+    const aid = parseInt(sel.value);
+    if (!aid) return;
+    currentChatAreaId = aid;
+    if (areaChatSocket) {
+        areaChatSocket.emit('leave_area_chat', { area_id: aid });
+        areaChatSocket.emit('join_area_chat', { area_id: aid });
+    }
+    loadAreaChatMessages(aid);
+}
+
+async function loadAreaChatMessages(areaId) {
+    const msgs = await fetchAPI(`/area-chat/${areaId}`);
+    const container = document.getElementById('area-chat-messages');
+    container.innerHTML = '';
+    if (!msgs || msgs.length === 0) {
+        container.innerHTML = '<div style="text-align:center;color:#999;padding:40px;font-size:13px;">💬 No hay mensajes aún. ¡Empieza a chatear!</div>';
+        return;
+    }
+    areaChatMessages[areaId] = msgs;
+    msgs.forEach(m => appendChatMessage(m));
+    container.scrollTop = container.scrollHeight;
+}
+
+function appendChatMessage(msg) {
+    const container = document.getElementById('area-chat-messages');
+    const empty = container.querySelector('#area-chat-empty');
+    if (empty) empty.remove();
+    const isMe = msg.user_id === user?.id || msg.username === user?.name || msg.username === user?.username;
+    const div = document.createElement('div');
+    div.className = `chat-msg ${isMe ? 'me' : 'other'}`;
+    const time = msg.created_at ? new Date(msg.created_at + (msg.created_at.includes('T') ? '' : 'T00:00:00')).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+    div.innerHTML = `
+        ${!isMe ? `<div class="msg-user"><span class="urgency-dot" style="background:${msg.urgency_color||'#FFC107'}"></span>${msg.username || msg.user_name || 'Usuario'}</div>` : ''}
+        ${msg.message}
+        <div class="msg-time">${time}</div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function selectChatUrgency(el) {
+    document.querySelectorAll('#area-chat-urgency button').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+    chatUrgencyColor = el.dataset.color;
+}
+
+async function sendAreaChat() {
+    const input = document.getElementById('area-chat-input');
+    const companySel = document.getElementById('area-chat-company');
+    const msg = input.value.trim();
+    const companyId = parseInt(companySel.value);
+    if (!currentChatAreaId) { showNotification('Selecciona un área primero', 'error'); return; }
+    if (!msg) { showNotification('Escribe un mensaje', 'error'); return; }
+    if (!companyId) { showNotification('Selecciona una empresa', 'error'); return; }
+    input.value = '';
+    const result = await fetchAPI(`/area-chat/${currentChatAreaId}`, {
+        method: 'POST',
+        body: JSON.stringify({ message: msg, company_id: companyId, urgency_color: chatUrgencyColor })
+    });
+    if (!result) showNotification('Error al enviar mensaje', 'error');
+}
+
+function updateChatBadge() {
+    const badge = document.getElementById('area-chat-badge');
+    // Simple badge logic - could track unread per area
+    badge.style.display = 'none';
+}
+
+// ===== MARKETING IDEAS =====
+async function loadMarketingIdeas() {
+    const container = document.getElementById('marketing-ideas');
+    const suggestions = await fetchAPI('/marketing/suggestions');
+    if (!suggestions || suggestions.length === 0) {
+        container.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">El agente de marketing aún no ha generado ideas. Vuelve más tarde.</p>';
+        return;
+    }
+    container.innerHTML = '';
+    suggestions.slice(-6).reverse().forEach(s => {
+        const card = document.createElement('div');
+        card.style.cssText = 'background:#f8f9fa;border-radius:8px;padding:14px;border:1px solid #e0e0e0;';
+        card.innerHTML = `
+            <div style="font-size:11px;color:#999;margin-bottom:4px;">📅 ${s.created_at || ''}</div>
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px;">${s.title}</div>
+            <div style="font-size:12px;color:#666;">${s.description || ''}</div>
+            ${s.company ? `<div style="font-size:11px;color:#999;margin-top:4px;">🏢 ${s.company}</div>` : ''}`;
+        container.appendChild(card);
+    });
+}
+
+// ===== RANKING =====
+async function loadRanking() {
+    const container = document.getElementById('ranking-grid');
+    const metrics = await fetchAPI('/tasks/stats');
+    if (!metrics || !metrics.by_area) {
+        container.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">Sin datos de rendimiento aún.</p>';
+        return;
+    }
+    const areas = metrics.by_area;
+    const sorted = [...areas].sort((a, b) => ((b.realizadas || 0) / Math.max(b.total, 1)) - ((a.realizadas || 0) / Math.max(a.total, 1)));
+    const medals = ['🥇', '🥈', '🥉'];
+    container.innerHTML = '';
+    sorted.forEach((area, i) => {
+        const completed = area.realizadas || 0;
+        const rate = area.total > 0 ? (completed / area.total * 100) : 0;
+        const pct = Math.round(rate);
+        const barColor = pct >= 80 ? '#28A745' : pct >= 50 ? '#FFC107' : '#DC3545';
+        const item = document.createElement('div');
+        item.className = 'rank-item';
+        item.innerHTML = `
+            <div class="rank-pos">${i < 3 ? `<span class="rank-medal">${medals[i]}</span>` : `#${i+1}`}</div>
+            <div class="rank-name">${AREA_ICONS[area.name] || '📋'} ${area.name}</div>
+            <div class="rank-bar-wrap">
+                <div class="rank-bar" style="width:${Math.max(pct, 5)}%;background:${barColor};">${pct > 15 ? pct + '%' : ''}</div>
+            </div>
+            <div class="rank-pct">${pct}%</div>
+            <div style="font-size:10px;color:#999;width:50px;text-align:right;">${completed}/${area.total}</div>
+        `;
+        container.appendChild(item);
+    });
+}
+
+// ===== EXTEND LOAD DASHBOARD =====
 const origLoadDashboard = loadDashboard;
 loadDashboard = function() {
     origLoadDashboard();
     loadCalendar();
+    loadMarketingIdeas();
+    loadRanking();
+};
+
+// ===== EXTEND LOAD INITIAL DATA =====
+const origLoadInitialData = loadInitialData;
+loadInitialData = async function() {
+    await origLoadInitialData();
+    setTimeout(initAreaChat, 500);
 };
 
 // ===== DOCUMENT READY =====

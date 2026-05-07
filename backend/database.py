@@ -367,6 +367,18 @@ def _init_sqlite():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS area_chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            area_id INTEGER NOT NULL,
+            company_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            message TEXT NOT NULL,
+            urgency_color TEXT DEFAULT '#FFC107',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (area_id) REFERENCES areas(id) ON DELETE CASCADE,
+            FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+        );
         CREATE TABLE IF NOT EXISTS notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
@@ -576,7 +588,18 @@ def _init_pg():
             id SERIAL PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
             user_id INTEGER NOT NULL REFERENCES users(id), username TEXT NOT NULL,
             message TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )''',
+        ),
+        '''
+        CREATE TABLE IF NOT EXISTS area_chat_messages (
+            id SERIAL PRIMARY KEY,
+            area_id INTEGER NOT NULL REFERENCES areas(id) ON DELETE CASCADE,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            username TEXT NOT NULL,
+            message TEXT NOT NULL,
+            urgency_color TEXT DEFAULT '#FFC107',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ),
         '''
         CREATE TABLE IF NOT EXISTS notifications (
             id SERIAL PRIMARY KEY, user_id INTEGER, area_id INTEGER,

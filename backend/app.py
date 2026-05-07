@@ -1057,6 +1057,58 @@ def get_chat_messages(task_id):
     conn.close()
     return jsonify([dict(m) for m in msgs])
 
+# ===== AREA CHAT =====
+
+@app.route('/api/area-chat/<int:area_id>', methods=['GET'])
+@login_required
+def get_area_chat_messages(area_id):
+    conn = get_db()
+    msgs = conn.execute('''
+        SELECT ac.*, u.name as user_name
+        FROM area_chat_messages ac
+        LEFT JOIN users u ON ac.user_id = u.id
+        WHERE ac.area_id = ?
+        ORDER BY ac.created_at ASC LIMIT 200
+    ''', (area_id,)).fetchall()
+    conn.close()
+    return jsonify([dict(m) for m in msgs])
+
+@app.route('/api/area-chat/<int:area_id>', methods=['POST'])
+@login_required
+def send_area_chat_message(area_id):
+    data = request.json
+    message = data.get('message', '').strip()
+    company_id = data.get('company_id')
+    urgency_color = data.get('urgency_color', '#FFC107')
+    if not message or not company_id:
+        return jsonify({'error': 'Mensaje y empresa requeridos'}), 400
+    conn = get_db()
+    conn.execute('''
+        INSERT INTO area_chat_messages (area_id, company_id, user_id, username, message, urgency_color)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (area_id, company_id, session['user_id'], session.get('name', session.get('username', 'Usuario')), message, urgency_color))
+    conn.commit()
+    msg_id = last_insert_id(conn)
+    msg = conn.execute('''
+        SELECT ac.*, u.name as user_name
+        FROM area_chat_messages ac
+        LEFT JOIN users u ON ac.user_id = u.id
+        WHERE ac.id = ?
+    ''', (msg_id,)).fetchone()
+    conn.close()
+    socketio.emit('area_chat_message', dict(msg), room=f'area_chat_{area_id}')
+    return jsonify(dict(msg)), 201
+
+@socketio.on('join_area_chat')
+def handle_join_area_chat(data):
+    room = f"area_chat_{data.get('area_id')}"
+    join_room(room)
+
+@socketio.on('leave_area_chat')
+def handle_leave_area_chat(data):
+    room = f"area_chat_{data.get('area_id')}"
+    leave_room(room)
+
 # ===== BÚSQUEDA GLOBAL =====
 
 @app.route('/api/search')
