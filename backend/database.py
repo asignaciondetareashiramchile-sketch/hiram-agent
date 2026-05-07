@@ -417,6 +417,19 @@ def _init_sqlite():
         conn.execute('INSERT INTO users (username, password_hash, role, name, email) VALUES (?, ?, ?, ?, ?)',
                      ('admin', hash_password('admin123'), 'superadmin', 'Administrador',
                       'asignaciondetareashiramchile@gmail.com'))
+        area_users = [
+            (1, 'rrhh', 'rrhh2026', 'RRHH'),
+            (2, 'asistente_rrhh', 'asistente_rrhh2026', 'Asistente RRHH'),
+            (3, 'finanzas', 'finanzas2026', 'Finanzas'),
+            (4, 'ventas', 'ventas2026', 'Ventas'),
+            (5, 'contratos', 'contratos2026', 'Admin Contratos'),
+            (6, 'admin_general', 'admin_general2026', 'Admin General'),
+            (7, 'marketing', 'marketing2026', 'Marketing'),
+            (8, 'atencion', 'atencion2026', 'Atencion Cliente'),
+        ]
+        for area_id, username, password, name in area_users:
+            conn.execute('INSERT INTO users (username, password_hash, role, area_id, name) VALUES (?, ?, ?, ?, ?)',
+                         (username, hash_password(password), 'area', area_id, name))
 
     templates_data = [
         (1, 'Revisión de contratos del personal', 'Revisar y actualizar contratos vigentes del personal', 'media', 1, 30),
@@ -602,6 +615,19 @@ def _init_pg():
     if cur.fetchone()[0] == 0:
         cur.execute('INSERT INTO users (username, password_hash, role, name, email) VALUES (%s,%s,%s,%s,%s)',
                     ('admin', hash_password('admin123'), 'superadmin', 'Administrador', 'asignaciondetareashiramchile@gmail.com'))
+        area_users = [
+            (1, 'rrhh', 'rrhh2026', 'RRHH'),
+            (2, 'asistente_rrhh', 'asistente_rrhh2026', 'Asistente RRHH'),
+            (3, 'finanzas', 'finanzas2026', 'Finanzas'),
+            (4, 'ventas', 'ventas2026', 'Ventas'),
+            (5, 'contratos', 'contratos2026', 'Admin Contratos'),
+            (6, 'admin_general', 'admin_general2026', 'Admin General'),
+            (7, 'marketing', 'marketing2026', 'Marketing'),
+            (8, 'atencion', 'atencion2026', 'Atencion Cliente'),
+        ]
+        for area_id, username, password, name in area_users:
+            cur.execute('INSERT INTO users (username, password_hash, role, area_id, name) VALUES (%s,%s,%s,%s,%s)',
+                        (username, hash_password(password), 'area', area_id, name))
 
     templates = [
         (1, 'Revisión de contratos del personal', 'Revisar y actualizar contratos vigentes del personal', 'media', 1, 30),
