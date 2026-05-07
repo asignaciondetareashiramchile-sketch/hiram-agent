@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hiram Chile – ProClean Facilities | Sistema de Agentes IA</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="notification-container"></div>
+
+    <header>
+        <div class="header-content">
+            <div class="header-left">
+                <div class="logo-icon">H</div>
+                <div>
+                    <h1>Hiram Chile – ProClean Facilities</h1>
+                    <p class="header-subtitle" id="header-user">Sistema de Gestión de Agentes IA · 24/7</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="search-box">
+                    <input type="text" id="global-search" placeholder="🔍 Buscar tareas..." oninput="debounceSearch(this.value)">
+                    <div id="search-results" class="search-results" style="display:none;"></div>
+                </div>
+                <button class="header-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
+                <div class="notification-bell" onclick="toggleNotifications()">
+                    🔔<span class="notif-badge" id="notif-badge" style="display:none;">0</span>
+                </div>
+                <div class="header-stats">
+                    <div class="stat-item"><span id="total-tasks">0</span> Total</div>
+                    <div class="stat-item pending"><span id="pending-tasks">0</span> Pend.</div>
+                    <div class="stat-item doing"><span id="doing-tasks">0</span> Gest.</div>
+                    <div class="stat-item done"><span id="done-tasks">0</span> Done</div>
+                    <div class="stat-item overdue"><span id="vencidas-tasks">0</span> Venc.</div>
+                </div>
+                <div class="user-menu">
+                    <span class="user-name" id="user-name"></span>
+                    <a href="/api/auth/logout" class="logout-btn" title="Cerrar sesión">🚪</a>
+                </div>
+                <a href="/settings" class="header-link" title="Configuración">⚙️</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Notifications Panel -->
+        <div id="notifications-panel" class="notifications-panel" style="display:none;">
+            <div class="notif-header">
+                <h3>Notificaciones</h3>
+                <button onclick="markAllRead()" style="background:none;border:none;color:#1a73e8;cursor:pointer;font-size:12px;">✓ Marcar todas leídas</button>
+            </div>
+            <div id="notifications-list"></div>
+        </div>
+
+        <div id="dashboard-view">
+            <section class="company-bar">
+                <div class="section-header">
+                    <h2>🏢 Seleccionar Empresa</h2>
+                </div>
+                <div id="company-selector" class="company-selector"></div>
+            </section>
+
+            <section class="areas-section">
+                <div class="section-header">
+                    <h2>📋 Departamentos y Áreas</h2>
+                    <p class="section-desc">Selecciona un área para asignar tareas con prioridad y seguimiento</p>
+                </div>
+                <div id="areas-grid" class="areas-grid"></div>
+            </section>
+
+            <section id="agent-status" class="agent-section"></section>
+
+            <section id="task-templates-section" class="agent-section">
+                <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;">
+                    <h2>📋 Plantillas de Tareas</h2>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn-assign" style="width:auto;padding:8px 16px;background:#28A745;" onclick="runRecurring()">🔄 Recurrentes</button>
+                        <button class="btn-assign" style="width:auto;padding:8px 16px;" onclick="showTemplateModal()">+ Nueva Plantilla</button>
+                    </div>
+                </div>
+                <div id="templates-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+                    <p style="color:#999;text-align:center;padding:20px;">Cargando plantillas...</p>
+                </div>
+            </section>
+
+            <section id="marketing-section" class="agent-section">
+                <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;">
+                    <h2>🎨 Sugerencias del Agente de Marketing</h2>
+                    <button class="btn-assign" style="width:auto;padding:8px 16px;" onclick="generateMarketingSuggestions()">🔄 Generar Ahora</button>
+                </div>
+                <div id="marketing-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">
+                    <p style="color:#999;text-align:center;padding:20px;">Cargando sugerencias de marketing...</p>
+                </div>
+            </section>
+
+            <section id="metrics-section" class="agent-section">
+                <div class="section-header">
+                    <h2>📊 Métricas y Analytics</h2>
+                    <p class="section-desc">Rendimiento por área y tiempos de resolución</p>
+                </div>
+                <div id="metrics-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div style="background:#f8f9fa;border-radius:8px;padding:16px;border:1px solid #e0e0e0;">
+                        <h3 style="font-size:14px;margin-bottom:12px;">⏱ Tiempo promedio de resolución</h3>
+                        <div id="avg-time-chart"></div>
+                    </div>
+                    <div style="background:#f8f9fa;border-radius:8px;padding:16px;border:1px solid #e0e0e0;">
+                        <h3 style="font-size:14px;margin-bottom:12px;">📊 Tareas por prioridad</h3>
+                        <div id="priority-chart"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="calendar-section" class="agent-section">
+                <div class="section-header">
+                    <h2>📅 Calendario de Vencimientos</h2>
+                    <p class="section-desc">Tareas con fecha límite en los próximos 60 días</p>
+                </div>
+                <div id="calendar-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">
+                    <p style="color:#999;text-align:center;padding:20px;">Cargando calendario...</p>
+                </div>
+            </section>
+
+            <section id="activity-section" class="agent-section">
+                <div class="section-header">
+                    <h2>📋 Registro de Actividad Global</h2>
+                    <p class="section-desc">Historial reciente de tareas, cambios de estado y sugerencias</p>
+                </div>
+                <div id="activity-feed" style="background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;padding:8px 0;"></div>
+            </section>
+        </div>
+
+        <div id="area-tasks-view" style="display:none;">
+            <div class="view-header">
+                <button class="btn-back" onclick="showDashboard()">← Volver al Dashboard</button>
+                <h2 id="view-title"></h2>
+                <div class="filter-bar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <select id="status-filter" onchange="filterTasks()">
+                        <option value="">Todos los estados</option>
+                        <option value="pendiente">⏳ Pendiente</option>
+                        <option value="gestionando">🔄 Gestionando</option>
+                        <option value="realizada">✅ Realizada</option>
+                        <option value="cancelada">❌ Cancelada</option>
+                    </select>
+                    <button class="btn-assign" style="width:auto;padding:6px 12px;font-size:12px;" onclick="toggleKanban()">📋 Kanban</button>
+                    <button class="btn-assign" style="width:auto;padding:6px 12px;font-size:12px;" onclick="openTaskModal(currentAreaId, '', '')">+ Tarea</button>
+                    <button class="btn-assign" style="width:auto;padding:6px 12px;font-size:12px;background:#1a73e8;" onclick="exportTasks()">📄 Exportar</button>
+                </div>
+            </div>
+            <div id="area-tasks-list" class="tasks-list"></div>
+            <div id="kanban-view" class="kanban-board" style="display:none;">
+                <div class="kanban-column" data-status="pendiente">
+                    <div class="kanban-header pendiente">⏳ Pendiente</div>
+                    <div class="kanban-cards" id="kanban-pendiente"></div>
+                </div>
+                <div class="kanban-column" data-status="gestionando">
+                    <div class="kanban-header gestionando">🔄 Gestionando</div>
+                    <div class="kanban-cards" id="kanban-gestionando"></div>
+                </div>
+                <div class="kanban-column" data-status="realizada">
+                    <div class="kanban-header realizada">✅ Realizada</div>
+                    <div class="kanban-cards" id="kanban-realizada"></div>
+                </div>
+                <div class="kanban-column" data-status="cancelada">
+                    <div class="kanban-header cancelada">❌ Cancelada</div>
+                    <div class="kanban-cards" id="kanban-cancelada"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Task Modal -->
+    <div id="task-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📝 Asignar Nueva Tarea</h2>
+                <button class="btn-close" onclick="closeTaskModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modal-area-id">
+                <p id="modal-area-name" class="modal-area-name"></p>
+                <div class="form-group">
+                    <label>🏢 Empresa</label>
+                    <select id="modal-company" class="form-select"><option value="">Seleccionar empresa...</option></select>
+                </div>
+                <div class="form-group">
+                    <label>📋 Título</label>
+                    <input type="text" id="task-title" placeholder="Describe la tarea brevemente" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>📝 Descripción</label>
+                    <textarea id="task-desc" placeholder="Detalles adicionales (opcional)" class="form-input" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>🎯 Prioridad</label>
+                    <div class="priority-selector">
+                        <button class="priority-btn" data-priority="urgente" onclick="selectPriority(this,'urgente')" style="background:#7B2D8E;">🔮 Urgente</button>
+                        <button class="priority-btn" data-priority="alta" onclick="selectPriority(this,'alta')" style="background:#DC3545;">🔴 Alta</button>
+                        <button class="priority-btn selected" data-priority="media" onclick="selectPriority(this,'media')" style="background:#FFC107;">🟡 Media</button>
+                        <button class="priority-btn" data-priority="baja" onclick="selectPriority(this,'baja')" style="background:#28A745;">🟢 Baja</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>📎 Archivos adjuntos</label>
+                    <input type="file" id="task-files" multiple class="form-input" style="padding:8px;">
+                </div>
+                <button class="btn-submit" onclick="submitTask()">✅ Asignar Tarea</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Modal -->
+    <div id="chat-modal" class="modal">
+        <div class="modal-content" style="max-width:500px;height:70vh;display:flex;flex-direction:column;">
+            <div class="modal-header">
+                <h2 id="chat-title">💬 Chat de Tarea</h2>
+                <button class="btn-close" onclick="closeChatModal()">&times;</button>
+            </div>
+            <div id="chat-messages" style="flex:1;overflow-y:auto;padding:12px;background:#f8f9fa;"></div>
+            <div style="display:flex;gap:8px;padding:12px;border-top:1px solid #eee;">
+                <input type="text" id="chat-input" placeholder="Escribe un mensaje..." class="form-input"
+                       onkeydown="if(event.key==='Enter')sendChatMessage()" style="flex:1;">
+                <button class="btn-assign" onclick="sendChatMessage()" style="width:auto;padding:8px 16px;">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Modal -->
+    <div id="template-modal" class="modal">
+        <div class="modal-content" style="max-width:500px;">
+            <div class="modal-header">
+                <h2>📋 Nueva Plantilla</h2>
+                <button class="btn-close" onclick="closeTemplateModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>🏢 Área</label>
+                    <select id="tmpl-area" class="form-select"></select>
+                </div>
+                <div class="form-group">
+                    <label>📋 Título</label>
+                    <input type="text" id="tmpl-title" class="form-input" placeholder="Nombre de la plantilla">
+                </div>
+                <div class="form-group">
+                    <label>📝 Descripción</label>
+                    <textarea id="tmpl-desc" class="form-input" rows="2" placeholder="Descripción"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>🎯 Prioridad</label>
+                    <select id="tmpl-priority" class="form-select">
+                        <option value="urgente">🔮 Urgente - 3h</option>
+                        <option value="alta">🔴 Alta - Hoy</option>
+                        <option value="media" selected>🟡 Media - 3 días</option>
+                        <option value="baja">🟢 Baja - 5 días</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="tmpl-recurring"> Tarea recurrente</label>
+                </div>
+                <div class="form-group" id="tmpl-days-group" style="display:none;">
+                    <label>Cada (días)</label>
+                    <input type="number" id="tmpl-days" class="form-input" value="30" min="1">
+                </div>
+                <button class="btn-submit" onclick="saveTemplate()">💾 Guardar Plantilla</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check auth on load
+        fetch('/api/auth/me').then(r => { if (!r.ok) window.location.href = '/login'; });
+    </script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+    </script>
+</body>
+</html>

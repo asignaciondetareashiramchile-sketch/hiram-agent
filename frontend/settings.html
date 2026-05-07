@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración - Hiram Chile</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        .settings-container { max-width: 800px; margin: 0 auto; }
+        .settings-card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .settings-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .settings-card h3 { font-size: 14px; font-weight: 600; color: #666; margin: 16px 0 8px; }
+        .form-row { margin-bottom: 14px; }
+        .form-row label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #333; }
+        .form-row input { width: 100%; padding: 10px 14px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+        .form-row input:focus { outline: none; border-color: #1a73e8; }
+        .form-row .help { font-size: 12px; color: #999; margin-top: 4px; }
+        .btn-save { background: #1a237e; color: white; border: none; padding: 12px 32px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+        .btn-save:hover { background: #283593; }
+        .btn-test { background: #1a73e8; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-left: 8px; }
+        .btn-test:hover { background: #1557b0; }
+        .success-msg { background: #d4edda; color: #155724; padding: 12px; border-radius: 8px; margin-top: 12px; display: none; }
+        .error-msg { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 8px; margin-top: 12px; display: none; }
+        .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+        .status-dot.on { background: #28A745; }
+        .status-dot.off { background: #DC3545; }
+        .info-box { background: #e3f2fd; border-left: 4px solid #1a73e8; padding: 12px 16px; border-radius: 4px; margin: 12px 0; font-size: 13px; color: #0d47a1; }
+        .flex-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content" style="max-width:860px;">
+            <div class="header-left">
+                <div class="logo-icon">H</div>
+                <div>
+                    <h1>Hiram Chile – ProClean Facilities</h1>
+                    <p class="header-subtitle">⚙️ Configuración del Sistema</p>
+                </div>
+            </div>
+            <a href="/" style="color:white;font-size:14px;font-weight:600;text-decoration:none;">← Volver al Dashboard</a>
+        </div>
+    </header>
+
+    <main>
+        <div class="settings-container">
+            <div id="notifications"></div>
+
+            <div class="settings-card">
+                <h2>📧 Configuración SMTP (Correos Electrónicos)</h2>
+                <p style="color:#666;font-size:13px;margin-bottom:16px;">Configura los datos de tu servidor de correo para que el sistema envíe notificaciones a las áreas.</p>
+
+                <div id="smtp-status" class="info-box">🔌 Verificando estado SMTP...</div>
+
+                <div class="form-row">
+                    <label>Servidor SMTP</label>
+                    <input type="text" id="smtp_server" placeholder="smtp.gmail.com">
+                    <div class="help">Ej: smtp.gmail.com, smtp.office365.com, smtp.sendgrid.net</div>
+                </div>
+
+                <div class="form-row">
+                    <label>Puerto SMTP</label>
+                    <input type="number" id="smtp_port" placeholder="587">
+                    <div class="help">587 (TLS) o 465 (SSL)</div>
+                </div>
+
+                <div class="form-row">
+                    <label>Usuario / Email</label>
+                    <input type="text" id="smtp_user" placeholder="tu@email.com">
+                </div>
+
+                <div class="form-row">
+                    <label>Contraseña</label>
+                    <input type="password" id="smtp_pass" placeholder="Contraseña o App Password">
+                    <div class="help">Para Gmail usa una <a href="https://support.google.com/accounts/answer/185833" target="_blank">App Password</a></div>
+                </div>
+
+                <div class="form-row">
+                    <label>Email Remitente</label>
+                    <input type="text" id="from_email" placeholder="notificaciones@hiramchile.cl">
+                    <div class="help">Dirección que aparecerá como remitente</div>
+                </div>
+
+                <div class="flex-row">
+                    <button class="btn-save" onclick="saveSettings()">💾 Guardar Configuración</button>
+                    <button class="btn-test" onclick="testEmail()">📧 Probar Email</button>
+                </div>
+                <div id="save-msg" class="success-msg"></div>
+                <div id="error-msg" class="error-msg"></div>
+            </div>
+
+            <div class="settings-card">
+                <h2>☁️ Microsoft Graph API (Office 365)</h2>
+                <p style="color:#666;font-size:13px;margin-bottom:16px;">Alternativa a SMTP para enviar correos desde Office 365. Requiere registro de app en Azure AD.</p>
+
+                <div id="graph-status" class="info-box">🔌 Verificando estado Graph API...</div>
+
+                <div class="form-row">
+                    <label>Tenant ID</label>
+                    <input type="text" id="graph_tenant_id" placeholder="00000000-0000-0000-0000-000000000000">
+                    <div class="help">ID del inquilino de Azure AD (se encuentra en Azure Portal → Azure Active Directory → Propiedades)</div>
+                </div>
+
+                <div class="form-row">
+                    <label>Client ID</label>
+                    <input type="text" id="graph_client_id" placeholder="00000000-0000-0000-0000-000000000000">
+                    <div class="help">ID de la aplicación registrada en Azure AD</div>
+                </div>
+
+                <div class="form-row">
+                    <label>Client Secret</label>
+                    <input type="password" id="graph_client_secret" placeholder="secret...">
+                    <div class="help">Secret generado en Azure AD → App registrations → Certificates & secrets</div>
+                </div>
+
+                <div class="form-row">
+                    <label>Email del remitente (cuenta Office 365)</label>
+                    <input type="text" id="graph_user_email" placeholder="admin@poffice.cl">
+                    <div class="help">Cuenta con licencia Exchange Online que enviará los correos</div>
+                </div>
+
+                <div class="flex-row">
+                    <button class="btn-save" onclick="saveGraphSettings()">💾 Guardar Graph API</button>
+                    <button class="btn-test" onclick="testGraphEmail()">☁️ Probar Graph API</button>
+                </div>
+            </div>
+
+            <div class="settings-card">
+                <h2>🌐 URL Pública (Botones de Email)</h2>
+                <p style="color:#666;font-size:13px;margin-bottom:16px;">Configura la URL pública para que los botones "Gestionando" y "Realizado" en los correos funcionen desde cualquier cliente de email.</p>
+
+                <div id="tunnel-status" class="info-box">🔌 Verificando túnel...</div>
+
+                <div class="form-row">
+                    <label>Base URL</label>
+                    <input type="text" id="base_url" placeholder="http://localhost:8080">
+                    <div class="help">Usa localhost.run: <code>ssh -R 80:localhost:8080 nokey@localhost.run</code> — la URL se muestra al conectar (ej: https://xxxx.lhr.life)</div>
+                </div>
+
+                <button class="btn-save" onclick="saveBaseUrl()">💾 Guardar URL</button>
+            </div>
+
+            <div class="settings-card">
+                <h2>🤖 Configuración de Agentes IA</h2>
+
+                <div class="form-row">
+                    <label>Intervalo de sugerencias de tareas (horas)</label>
+                    <input type="number" id="agent_interval_hours" placeholder="6" min="1" max="24">
+                </div>
+
+                <div class="form-row">
+                    <label>Hora de recordatorio diario</label>
+                    <input type="number" id="daily_reminder_hour" placeholder="9" min="0" max="23">
+                </div>
+
+                <button class="btn-save" onclick="saveAgentSettings()">💾 Guardar</button>
+            </div>
+
+            <div class="settings-card">
+                <h2>📊 Estado del Sistema</h2>
+                <div id="system-status">
+                    <p>Cargando...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function loadSettings() {
+            const res = await fetch('/api/settings');
+            const settings = await res.json();
+
+            document.getElementById('smtp_server').value = settings.smtp_server || '';
+            document.getElementById('smtp_port').value = settings.smtp_port || '587';
+            document.getElementById('smtp_user').value = settings.smtp_user || '';
+            document.getElementById('from_email').value = settings.from_email || 'notificaciones@hiramchile.cl';
+            document.getElementById('agent_interval_hours').value = settings.agent_interval_hours || '6';
+            document.getElementById('daily_reminder_hour').value = settings.daily_reminder_hour || '9';
+            document.getElementById('base_url').value = settings.base_url || 'http://localhost:8080';
+            document.getElementById('graph_tenant_id').value = settings.graph_tenant_id || '';
+            document.getElementById('graph_client_id').value = settings.graph_client_id || '';
+            document.getElementById('graph_client_secret').value = '';
+            document.getElementById('graph_user_email').value = settings.graph_user_email || '';
+
+            const graphConfigured = settings.graph_tenant_id && settings.graph_client_id;
+            document.getElementById('graph-status').innerHTML = graphConfigured
+                ? '<span class="status-dot on"></span> ✅ Graph API configurado'
+                : '<span class="status-dot off"></span> ⚠️ Graph API no configurado. Configura Tenant ID y Client ID para usar Office 365.';
+
+            const tunnelUrl = settings.base_url || '';
+            document.getElementById('tunnel-status').innerHTML = tunnelUrl && !tunnelUrl.includes('localhost')
+                ? '<span class="status-dot on"></span> ✅ Túnel activo: <a href="' + tunnelUrl + '" target="_blank" style="color:#1a73e8;">' + tunnelUrl + '</a>'
+                : '<span class="status-dot off"></span> ⚠ Usando localhost. Los botones de email solo funcionarán desde el mismo equipo. Configura un túnel (localhost.run).';
+
+            const configured = settings.smtp_configured === 'true';
+            document.getElementById('smtp-status').innerHTML = configured
+                ? '<span class="status-dot on"></span> ✅ SMTP configurado y listo para enviar correos'
+                : '<span class="status-dot off"></span> ⚠️ SMTP no configurado. Los correos se muestran en consola (modo mock)';
+        }
+
+        async function saveSettings() {
+            const data = {
+                smtp_server: document.getElementById('smtp_server').value,
+                smtp_port: document.getElementById('smtp_port').value,
+                smtp_user: document.getElementById('smtp_user').value,
+                smtp_pass: document.getElementById('smtp_pass').value,
+                from_email: document.getElementById('from_email').value,
+                smtp_configured: document.getElementById('smtp_user').value ? 'true' : 'false'
+            };
+
+            const res = await fetch('/api/settings', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                document.getElementById('save-msg').style.display = 'block';
+                document.getElementById('save-msg').textContent = '✅ Configuración guardada exitosamente';
+                document.getElementById('error-msg').style.display = 'none';
+                setTimeout(() => document.getElementById('save-msg').style.display = 'none', 3000);
+                loadSettings();
+            } else {
+                document.getElementById('error-msg').style.display = 'block';
+                document.getElementById('error-msg').textContent = '❌ Error al guardar configuración';
+            }
+        }
+
+        async function saveBaseUrl() {
+            const data = { base_url: document.getElementById('base_url').value };
+            const res = await fetch('/api/settings', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            if (res.ok) {
+                document.getElementById('save-msg').style.display = 'block';
+                document.getElementById('save-msg').textContent = '✅ URL pública guardada';
+                document.getElementById('error-msg').style.display = 'none';
+                setTimeout(() => document.getElementById('save-msg').style.display = 'none', 3000);
+                loadSettings();
+            }
+        }
+
+        async function testEmail() {
+            const email = prompt('Email de prueba:', document.getElementById('from_email').value || 'test@poffice.cl');
+            if (!email) return;
+
+            const btn = document.querySelector('.btn-test');
+            btn.disabled = true;
+            btn.textContent = '⏳ Enviando...';
+
+            const res = await fetch('/api/settings/test-email', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email})
+            });
+
+            if (res.ok) {
+                document.getElementById('save-msg').style.display = 'block';
+                document.getElementById('save-msg').textContent = `✅ Email de prueba enviado a ${email}`;
+                document.getElementById('error-msg').style.display = 'none';
+            } else {
+                document.getElementById('error-msg').style.display = 'block';
+                document.getElementById('error-msg').textContent = '❌ Error. Verifica los datos SMTP.';
+                document.getElementById('save-msg').style.display = 'none';
+            }
+
+            btn.disabled = false;
+            btn.textContent = '📧 Probar Email';
+        }
+
+        async function saveGraphSettings() {
+            const data = {
+                graph_tenant_id: document.getElementById('graph_tenant_id').value,
+                graph_client_id: document.getElementById('graph_client_id').value,
+                graph_client_secret: document.getElementById('graph_client_secret').value,
+                graph_user_email: document.getElementById('graph_user_email').value,
+                graph_configured: document.getElementById('graph_tenant_id').value && document.getElementById('graph_client_id').value ? 'true' : 'false'
+            };
+
+            const res = await fetch('/api/settings', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                document.getElementById('save-msg').style.display = 'block';
+                document.getElementById('save-msg').textContent = '✅ Configuración Graph API guardada';
+                document.getElementById('error-msg').style.display = 'none';
+                setTimeout(() => document.getElementById('save-msg').style.display = 'none', 3000);
+                loadSettings();
+            } else {
+                document.getElementById('error-msg').style.display = 'block';
+                document.getElementById('error-msg').textContent = '❌ Error al guardar Graph API';
+            }
+        }
+
+        async function testGraphEmail() {
+            const email = prompt('Email de prueba:', document.getElementById('graph_user_email').value || 'admin@poffice.cl');
+            if (!email) return;
+
+            const btn = document.querySelectorAll('.btn-test')[1];
+            btn.disabled = true;
+            btn.textContent = '⏳ Enviando...';
+
+            const res = await fetch('/api/settings/test-graph', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email})
+            });
+
+            if (res.ok) {
+                document.getElementById('save-msg').style.display = 'block';
+                document.getElementById('save-msg').textContent = '✅ Email de prueba enviado vía Graph API';
+                document.getElementById('error-msg').style.display = 'none';
+            } else {
+                const err = await res.json();
+                document.getElementById('error-msg').style.display = 'block';
+                document.getElementById('error-msg').textContent = '❌ ' + (err.error || 'Error al enviar vía Graph API');
+                document.getElementById('save-msg').style.display = 'none';
+            }
+
+            btn.disabled = false;
+            btn.textContent = '☁️ Probar Graph API';
+        }
+
+        async function saveAgentSettings() {
+            const data = {
+                agent_interval_hours: document.getElementById('agent_interval_hours').value,
+                daily_reminder_hour: document.getElementById('daily_reminder_hour').value
+            };
+
+            const res = await fetch('/api/settings', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                document.getElementById('save-msg').style.display = 'block';
+                document.getElementById('save-msg').textContent = '✅ Configuración de agentes guardada';
+                document.getElementById('error-msg').style.display = 'none';
+                setTimeout(() => document.getElementById('save-msg').style.display = 'none', 3000);
+            }
+        }
+
+        async function loadSystemStatus() {
+            const agents = await fetch('/api/agent/status').then(r => r.json());
+            const stats = await fetch('/api/tasks/stats').then(r => r.json());
+
+            const container = document.getElementById('system-status');
+            container.innerHTML = `
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div style="background:#f8f9fa;padding:14px;border-radius:8px;">
+                        <strong>Tareas totales:</strong> ${stats.total || 0}
+                    </div>
+                    <div style="background:#f8f9fa;padding:14px;border-radius:8px;">
+                        <strong>Pendientes:</strong> ${stats.pendientes || 0}
+                    </div>
+                    <div style="background:#f8f9fa;padding:14px;border-radius:8px;">
+                        <strong>En gestión:</strong> ${stats.gestionando || 0}
+                    </div>
+                    <div style="background:#f8f9fa;padding:14px;border-radius:8px;">
+                        <strong>Realizadas:</strong> ${stats.realizadas || 0}
+                    </div>
+                    <div style="background:#f8f9fa;padding:14px;border-radius:8px;">
+                        <strong>Vencidas:</strong> ${stats.vencidas || 0}
+                    </div>
+                    <div style="background:#f8f9fa;padding:14px;border-radius:8px;">
+                        <strong>Agentes activos:</strong> ${agents.filter(a => a.agent_status === 'activo').length}/${agents.length}
+                    </div>
+                </div>
+            `;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            loadSystemStatus();
+        });
+    </script>
+</body>
+</html>
