@@ -312,6 +312,7 @@ def _init_sqlite():
             is_recurring INTEGER DEFAULT 0,
             recurring_days INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(area_id, title),
             FOREIGN KEY (area_id) REFERENCES areas(id),
             FOREIGN KEY (company_id) REFERENCES companies(id)
         );
