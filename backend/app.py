@@ -397,13 +397,29 @@ def update_task(task_id):
 @role_required('superadmin', 'admin')
 def delete_task(task_id):
     conn = get_db()
-    conn.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
     conn.execute('DELETE FROM task_logs WHERE task_id = ?', (task_id,))
+    conn.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
     conn.commit()
     conn.close()
     socketio.emit('task_deleted', {'task_id': task_id}, room='dashboard')
     socketio.emit('stats_update', {}, room='dashboard')
     return jsonify({'message': 'Tarea eliminada'})
+
+
+@app.route('/api/cleanup', methods=['POST'])
+@login_required
+@role_required('superadmin')
+def cleanup_tasks():
+    data = request.json
+    keep_ids = data.get('keep_ids', [])
+    conn = get_db()
+    conn.execute('DELETE FROM task_logs WHERE task_id NOT IN ({})'.format(','.join('?' * len(keep_ids))), keep_ids)
+    conn.execute('DELETE FROM tasks WHERE id NOT IN ({})'.format(','.join('?' * len(keep_ids))), keep_ids)
+    conn.commit()
+    conn.close()
+    socketio.emit('stats_update', {}, room='dashboard')
+    return jsonify({'message': f'Tareas limpiadas, conservadas {len(keep_ids)}'})
+
 
 # ===== ATTACHMENTS =====
 
