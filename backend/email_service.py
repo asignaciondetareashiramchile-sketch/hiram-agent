@@ -22,8 +22,7 @@ COMPANY_COLORS = {
 
 def get_smtp_config():
     conn = get_db()
-    cursor = conn.cursor()
-    settings = cursor.execute('SELECT key, value FROM settings').fetchall()
+    settings = conn.execute('SELECT key, value FROM settings').fetchall()
     conn.close()
     config = {}
     for s in settings:

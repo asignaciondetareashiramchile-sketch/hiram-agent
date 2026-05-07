@@ -275,7 +275,7 @@ def create_task():
     conn.execute('''
         INSERT INTO metrics_daily (area_id, date, tasks_created)
         VALUES (?, date('now'), 1)
-        ON CONFLICT(area_id, date) DO UPDATE SET tasks_created = tasks_created + 1
+        ON CONFLICT(area_id, date) DO UPDATE SET tasks_created = metrics_daily.tasks_created + 1
     ''', (data['area_id'],))
     conn.commit()
     conn.close()
@@ -318,7 +318,7 @@ def update_task_status(task_id, status):
         conn.execute('''
             INSERT INTO metrics_daily (area_id, date, tasks_completed)
             VALUES (?, date('now'), 1)
-            ON CONFLICT(area_id, date) DO UPDATE SET tasks_completed = tasks_completed + 1
+            ON CONFLICT(area_id, date) DO UPDATE SET tasks_completed = metrics_daily.tasks_completed + 1
         ''', (old['area_id'],))
         # Calcular completion time
         task_data = conn.execute('SELECT created_at, due_date FROM tasks WHERE id = ?', (task_id,)).fetchone()
@@ -328,7 +328,7 @@ def update_task_status(task_id, status):
             conn.execute('''
                 INSERT INTO metrics_daily (area_id, date, avg_completion_hours)
                 VALUES (?, date('now'), ?)
-                ON CONFLICT(area_id, date) DO UPDATE SET avg_completion_hours = (avg_completion_hours + ?) / 2
+                ON CONFLICT(area_id, date) DO UPDATE SET avg_completion_hours = (metrics_daily.avg_completion_hours + ?) / 2
             ''', (old['area_id'], hours, hours))
     else:
         conn.execute('UPDATE tasks SET status = ? WHERE id = ?', (status, task_id))

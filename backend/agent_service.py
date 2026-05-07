@@ -290,9 +290,8 @@ BLOG_IDEAS = [
 
 def generate_marketing_suggestions():
     conn = get_db()
-    cursor = conn.cursor()
 
-    setting = cursor.execute("SELECT value FROM settings WHERE key = 'marketing_agent_active'").fetchone()
+    setting = conn.execute("SELECT value FROM settings WHERE key = 'marketing_agent_active'").fetchone()
     if not setting or setting['value'] != 'true':
         conn.close()
         return []
@@ -334,11 +333,10 @@ def generate_marketing_suggestions():
 
 def generate_task_followups():
     conn = get_db()
-    cursor = conn.cursor()
 
     today = datetime.now().strftime('%Y-%m-%d')
 
-    overdue_tasks = cursor.execute('''
+    overdue_tasks = conn.execute('''
         SELECT t.*, a.name as area_name, a.email as area_email, c.name as company_name
         FROM tasks t
         JOIN areas a ON t.area_id = a.id
@@ -390,14 +388,13 @@ def generate_task_followups():
 
 def generate_ai_suggestions():
     conn = get_db()
-    cursor = conn.cursor()
 
     templates = random.sample(TASK_TEMPLATES, min(3, len(TASK_TEMPLATES)))
     suggestions = []
 
     for template in templates:
         company = random.choice(COMPANIES)
-        area_row = cursor.execute(
+        area_row = conn.execute(
             'SELECT id, name, email FROM areas WHERE name = ?',
             (template['area_hint'],)
         ).fetchone()
@@ -422,27 +419,26 @@ def generate_ai_suggestions():
 
 def get_agent_status():
     conn = get_db()
-    cursor = conn.cursor()
 
-    areas = cursor.execute('SELECT * FROM areas').fetchall()
-    agents = cursor.execute('SELECT * FROM agents').fetchall()
+    areas = conn.execute('SELECT * FROM areas').fetchall()
+    agents = conn.execute('SELECT * FROM agents').fetchall()
     now = datetime.now()
 
     status = []
     for area in areas:
         agent = next((a for a in agents if a['area_id'] == area['id']), None)
 
-        pending = cursor.execute(
+        pending = conn.execute(
             "SELECT COUNT(*) as c FROM tasks WHERE area_id = ? AND status IN ('pendiente','gestionando')",
             (area['id'],)
         ).fetchone()
 
-        overdue = cursor.execute(
+        overdue = conn.execute(
             "SELECT COUNT(*) as c FROM tasks WHERE area_id = ? AND status IN ('pendiente','gestionando') AND due_date < ?",
             (area['id'], now.strftime('%Y-%m-%d'))
         ).fetchone()
 
-        completed_today = cursor.execute(
+        completed_today = conn.execute(
             "SELECT COUNT(*) as c FROM tasks WHERE area_id = ? AND status = 'realizada' AND date(completed_at) = ?",
             (area['id'], now.strftime('%Y-%m-%d'))
         ).fetchone()
