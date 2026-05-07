@@ -1,7 +1,7 @@
 import os
 import re
 import hashlib
-from datetime import datetime
+from datetime import datetime, date as date_type
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hiram.db')
@@ -81,8 +81,14 @@ class _RowProxy:
     def __getitem__(self, key):
         if isinstance(key, str):
             idx = self._keys.index(key.lower())
-            return self._values[idx]
-        return self._values[key]
+            val = self._values[idx]
+            if isinstance(val, date_type):
+                return val.isoformat()
+            return val
+        val = self._values[key]
+        if isinstance(val, date_type):
+            return val.isoformat()
+        return val
 
     def __getattr__(self, key):
         try:

@@ -4,7 +4,7 @@ import json
 import uuid
 import csv
 import io
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from flask import Flask, jsonify, request, send_from_directory, session, redirect, url_for, make_response
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -24,6 +24,13 @@ from agent_service import (
     generate_marketing_suggestions, generate_task_followups
 )
 from scheduler import start_scheduler
+
+def serialize_row(row):
+    d = dict(row)
+    for k, v in d.items():
+        if isinstance(v, (date, datetime)):
+            d[k] = v.isoformat()
+    return d
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 app.secret_key = os.environ.get('SECRET_KEY', 'hiram-chile-secret-key-2026')
@@ -280,15 +287,15 @@ def create_task():
     conn.commit()
     conn.close()
 
-    send_task_notification(dict(task), area['email'], area['name'], company['name'])
+    send_task_notification(serialize_row(task), area['email'], area['name'], company['name'])
     create_notification(None, data['area_id'], f'Nueva tarea: {data["title"]}',
                        f'Tarea asignada a {area["name"]}', 'task_created', f'/?area_id={data["area_id"]}')
 
-    socketio.emit('task_created', dict(task), room='dashboard')
+    socketio.emit('task_created', serialize_row(task), room='dashboard')
     socketio.emit('stats_update', {'area_id': data['area_id']}, room='dashboard')
     socketio.emit('notification', {'title': f'Nueva tarea: {data["title"]}', 'area_id': data['area_id']}, room='dashboard')
 
-    return jsonify(dict(task)), 201
+    return jsonify(serialize_row(task)), 201
 
 @app.route('/api/tasks/reorder', methods=['PUT'])
 @login_required
@@ -347,7 +354,7 @@ def update_task_status(task_id, status):
     conn.close()
 
     if task and status in ('gestionando', 'realizada'):
-        send_status_confirmation(dict(task), task['area_email'], task['area_name'], task['company_name'], status, old_status)
+        send_status_confirmation(serialize_row(task), task['area_email'], task['area_name'], task['company_name'], status, old_status)
 
     if task and status == 'realizada':
         send_auto_suggestion(task['area_name'], task['area_email'], task['company_name'])
@@ -604,7 +611,7 @@ def approve_suggestion(task_id):
                 (task_id, 'aprobada', 'Tarea sugerida por IA aprobada por el administrador'))
     conn.commit()
     conn.close()
-    send_task_notification(dict(task), task['area_email'], task['area_name'], task['company_name'])
+    send_task_notification(serialize_row(task), task['area_email'], task['area_name'], task['company_name'])
     html = '''
     <!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="3;url=/">
     <style>body{font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f4f4f4;}
@@ -774,7 +781,7 @@ def send_manual_reminder(task_id):
     conn.close()
     if not task:
         return jsonify({'error': 'Tarea no encontrada'}), 404
-    send_task_reminder(dict(task), task['area_email'], task['area_name'], task['company_name'])
+    send_task_reminder(serialize_row(task), task['area_email'], task['area_name'], task['company_name'])
     return jsonify({'message': 'Recordatorio enviado'})
 
 # ===== NOTIFICATIONS =====
