@@ -463,15 +463,13 @@ def get_agent_status():
 
 def initialize_agents():
     conn = get_db()
-    cursor = conn.cursor()
-
-    areas = cursor.execute('SELECT id, name FROM areas').fetchall()
+    areas = conn.execute('SELECT id, name FROM areas').fetchall()
     for area in areas:
-        existing = cursor.execute(
+        existing = conn.execute(
             'SELECT id FROM agents WHERE area_id = ?', (area['id'],)
         ).fetchone()
         if not existing:
-            cursor.execute(
+            conn.execute(
                 'INSERT INTO agents (name, area_id, status, last_active) VALUES (?, ?, ?, ?)',
                 (f'Agent-{area["name"]}', area['id'], 'activo', datetime.now().isoformat())
             )
