@@ -552,7 +552,8 @@ def _init_pg():
             id SERIAL PRIMARY KEY, area_id INTEGER NOT NULL REFERENCES areas(id),
             company_id INTEGER DEFAULT 1, title TEXT NOT NULL, description TEXT,
             priority TEXT DEFAULT 'media', is_recurring INTEGER DEFAULT 0,
-            recurring_days INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            recurring_days INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(area_id, title)
         )''',
         '''
         CREATE TABLE IF NOT EXISTS agents (
