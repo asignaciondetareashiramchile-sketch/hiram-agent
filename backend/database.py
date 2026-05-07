@@ -582,24 +582,21 @@ def _init_pg():
             id SERIAL PRIMARY KEY, task_id INTEGER, recipient TEXT NOT NULL,
             subject TEXT NOT NULL, email_type TEXT NOT NULL, status TEXT DEFAULT 'sent',
             error_message TEXT, sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )''',
+        )        ''',
         '''
         CREATE TABLE IF NOT EXISTS chat_messages (
             id SERIAL PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
             user_id INTEGER NOT NULL REFERENCES users(id), username TEXT NOT NULL,
             message TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ),
+        )''',
         '''
         CREATE TABLE IF NOT EXISTS area_chat_messages (
-            id SERIAL PRIMARY KEY,
-            area_id INTEGER NOT NULL REFERENCES areas(id) ON DELETE CASCADE,
+            id SERIAL PRIMARY KEY, area_id INTEGER NOT NULL REFERENCES areas(id) ON DELETE CASCADE,
             company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            username TEXT NOT NULL,
-            message TEXT NOT NULL,
-            urgency_color TEXT DEFAULT '#FFC107',
+            user_id INTEGER NOT NULL REFERENCES users(id), username TEXT NOT NULL,
+            message TEXT NOT NULL, urgency_color TEXT DEFAULT '#FFC107',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ),
+        )''',
         '''
         CREATE TABLE IF NOT EXISTS notifications (
             id SERIAL PRIMARY KEY, user_id INTEGER, area_id INTEGER,
