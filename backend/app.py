@@ -398,12 +398,47 @@ def update_task(task_id):
 def delete_task(task_id):
     conn = get_db()
     conn.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
-    conn.execute('DELETE FROM task_logs WHERE task_id = ?', (task_id,))
+    conn.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
     conn.commit()
     conn.close()
     socketio.emit('task_deleted', {'task_id': task_id}, room='dashboard')
     socketio.emit('stats_update', {}, room='dashboard')
     return jsonify({'message': 'Tarea eliminada'})
+
+
+@app.route('/api/cleanup', methods=['POST'])
+@login_required
+@role_required('superadmin')
+def cleanup_tasks():
+    data = request.json
+    keep_ids = data.get('keep_ids', [])
+    if not keep_ids:
+        return jsonify({'error': 'Se requieren keep_ids'}), 400
+    placeholders = ','.join('?' for _ in keep_ids)
+    conn = get_db()
+    conn.execute(f'DELETE FROM task_logs WHERE task_id NOT IN ({placeholders})', keep_ids)
+    conn.execute(f'DELETE FROM tasks WHERE id NOT IN ({placeholders})', keep_ids)
+    conn.commit()
+    conn.close()
+    socketio.emit('stats_update', {}, room='dashboard')
+    return jsonify({'message': f'Tareas limpiadas, conservadas {len(keep_ids)}'})
+
+
+
+@app.route('/api/cleanup/templates', methods=['POST'])
+@login_required
+@role_required('superadmin')
+def cleanup_templates():
+    conn = get_db()
+    conn.execute('''DELETE FROM task_templates WHERE id NOT IN (
+        SELECT MIN(id) FROM task_templates GROUP BY area_id, title
+    )''')
+    conn.commit()
+    remaining = conn.execute('SELECT COUNT(*) FROM task_templates').fetchone()[0]
+    conn.close()
+    socketio.emit('stats_update', {}, room='dashboard')
+    return jsonify({'message': f'Plantillas duplicadas eliminadas, quedan {remaining}'})
+
 
 # ===== ATTACHMENTS =====
 
