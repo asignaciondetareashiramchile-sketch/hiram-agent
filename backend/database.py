@@ -422,7 +422,8 @@ def _init_sqlite():
         ('ADMINISTRACION DE CONTRATOS', 'supervisiongeneral@poffice.cl', 'Administración de Contratos', '#ff6d01'),
         ('ADMINISTRACIÓN GENERAL', 'administracion@poffice.cl', 'Administración General', '#46bdc6'),
         ('MARKETING', 'marketing@poffice.cl', 'Departamento de Marketing', '#7B2D8E'),
-        ('ATENCION AL CLIENTE', 'atencionalcliente@poffice.cl', 'Atención al Cliente', '#e91e63')
+        ('ATENCION AL CLIENTE', 'atencionalcliente@poffice.cl', 'Atención al Cliente', '#e91e63'),
+        ('LOGÍSTICA', 'logistica@poffice.cl', 'Logística y Distribución', '#FF6B35')
     ]
     for name, email, desc, color in areas_data:
         conn.execute('INSERT OR IGNORE INTO areas (name, email, description, color) VALUES (?, ?, ?, ?)',
@@ -445,6 +446,7 @@ def _init_sqlite():
             (6, 'admin_general', 'admin_general2026', 'Admin General'),
             (7, 'marketing', 'marketing2026', 'Marketing'),
             (8, 'atencion', 'atencion2026', 'Atencion Cliente'),
+            (9, 'logistica', 'logistica2026', 'Logística'),
         ]
         for area_id, username, password, name in area_users:
             conn.execute('INSERT INTO users (username, password_hash, role, area_id, name) VALUES (?, ?, ?, ?, ?)',
@@ -462,7 +464,9 @@ def _init_sqlite():
         (6, 'Actualización procedimientos', 'Revisar manuales de procedimientos internos', 'baja', 1, 30),
         (7, 'Calendario de contenidos', 'Planificar contenido semanal para redes sociales', 'media', 1, 7),
         (7, 'Newsletter mensual', 'Preparar y enviar newsletter del mes', 'media', 1, 30),
-        (8, 'Encuesta satisfacción', 'Preparar encuestas de satisfacción a clientes', 'media', 1, 15)
+        (8, 'Encuesta satisfacción', 'Preparar encuestas de satisfacción a clientes', 'media', 1, 15),
+        (9, 'Planificación de rutas', 'Organizar rutas de distribución semanal', 'media', 1, 7),
+        (9, 'Inventario de bodega', 'Realizar conteo de inventario en bodega', 'alta', 1, 15),
     ]
     for area_id, title, desc, priority, recurring, days in templates_data:
         conn.execute(
@@ -500,6 +504,25 @@ def _init_sqlite():
 def _init_pg():
     conn = get_db()
     cur = conn.cursor()
+
+    # Drop all existing tables to ensure clean schema
+    cur.execute('DROP TABLE IF EXISTS metrics_daily CASCADE')
+    cur.execute('DROP TABLE IF EXISTS session_logs CASCADE')
+    cur.execute('DROP TABLE IF EXISTS notifications CASCADE')
+    cur.execute('DROP TABLE IF EXISTS area_chat_messages CASCADE')
+    cur.execute('DROP TABLE IF EXISTS chat_messages CASCADE')
+    cur.execute('DROP TABLE IF EXISTS email_logs CASCADE')
+    cur.execute('DROP TABLE IF EXISTS task_followups CASCADE')
+    cur.execute('DROP TABLE IF EXISTS marketing_suggestions CASCADE')
+    cur.execute('DROP TABLE IF EXISTS settings CASCADE')
+    cur.execute('DROP TABLE IF EXISTS agents CASCADE')
+    cur.execute('DROP TABLE IF EXISTS task_templates CASCADE')
+    cur.execute('DROP TABLE IF EXISTS task_logs CASCADE')
+    cur.execute('DROP TABLE IF EXISTS task_attachments CASCADE')
+    cur.execute('DROP TABLE IF EXISTS tasks CASCADE')
+    cur.execute('DROP TABLE IF EXISTS users CASCADE')
+    cur.execute('DROP TABLE IF EXISTS companies CASCADE')
+    cur.execute('DROP TABLE IF EXISTS areas CASCADE')
 
     tables = [
         '''
@@ -640,7 +663,8 @@ def _init_pg():
         ('ADMINISTRACION DE CONTRATOS', 'supervisiongeneral@poffice.cl', 'Administración de Contratos', '#ff6d01'),
         ('ADMINISTRACIÓN GENERAL', 'administracion@poffice.cl', 'Administración General', '#46bdc6'),
         ('MARKETING', 'marketing@poffice.cl', 'Departamento de Marketing', '#7B2D8E'),
-        ('ATENCION AL CLIENTE', 'atencionalcliente@poffice.cl', 'Atención al Cliente', '#e91e63')
+        ('ATENCION AL CLIENTE', 'atencionalcliente@poffice.cl', 'Atención al Cliente', '#e91e63'),
+        ('LOGÍSTICA', 'logistica@poffice.cl', 'Logística y Distribución', '#FF6B35')
     ]
     for name, email, desc, color in areas:
         cur.execute('INSERT INTO areas (name, email, description, color) VALUES (%s,%s,%s,%s) ON CONFLICT (name) DO NOTHING', (name, email, desc, color))
@@ -661,6 +685,7 @@ def _init_pg():
             (6, 'admin_general', 'admin_general2026', 'Admin General'),
             (7, 'marketing', 'marketing2026', 'Marketing'),
             (8, 'atencion', 'atencion2026', 'Atencion Cliente'),
+            (9, 'logistica', 'logistica2026', 'Logística'),
         ]
         for area_id, username, password, name in area_users:
             cur.execute('INSERT INTO users (username, password_hash, role, area_id, name) VALUES (%s,%s,%s,%s,%s)',
@@ -678,7 +703,9 @@ def _init_pg():
         (6, 'Actualización procedimientos', 'Revisar manuales de procedimientos internos', 'baja', 1, 30),
         (7, 'Calendario de contenidos', 'Planificar contenido semanal para redes sociales', 'media', 1, 7),
         (7, 'Newsletter mensual', 'Preparar y enviar newsletter del mes', 'media', 1, 30),
-        (8, 'Encuesta satisfacción', 'Preparar encuestas de satisfacción a clientes', 'media', 1, 15)
+        (8, 'Encuesta satisfacción', 'Preparar encuestas de satisfacción a clientes', 'media', 1, 15),
+        (9, 'Planificación de rutas', 'Organizar rutas de distribución semanal', 'media', 1, 7),
+        (9, 'Inventario de bodega', 'Realizar conteo de inventario en bodega', 'alta', 1, 15),
     ]
     for area_id, title, desc, priority, recurring, days in templates:
         cur.execute(
