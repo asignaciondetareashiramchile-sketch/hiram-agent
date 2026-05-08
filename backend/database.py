@@ -578,16 +578,7 @@ def _init_pg():
             recurring_days INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(area_id, title)
         )''',
-        cur.execute('''
-            DO $$ BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM pg_constraint WHERE conname = 'task_templates_area_id_title_key'
-                ) THEN
-                    ALTER TABLE task_templates ADD UNIQUE (area_id, title);
-                END IF;
-            END $$;
-        ''')
-        cur.execute('''
+        '''
         CREATE TABLE IF NOT EXISTS agents (
             id SERIAL PRIMARY KEY, name TEXT NOT NULL,
             area_id INTEGER NOT NULL REFERENCES areas(id),
