@@ -30,37 +30,9 @@ def daily_reminder_job():
     print(f"Recordatorios diarios: {sent}/{len(pending)} enviados")
 
 def agent_suggestion_job():
-    print(f"[{datetime.now()}] Agente IA generando sugerencias de tareas...")
-    suggestions = generate_ai_suggestions()
-
-    conn = get_db()
-
-    for sug in suggestions:
-        conn.execute('''
-            INSERT INTO tasks (area_id, company_id, title, description, priority, status, created_by)
-            VALUES (
-                (SELECT id FROM areas WHERE name = ?),
-                (SELECT id FROM companies WHERE name = ?),
-                ?, ?, ?, 'pendiente', 'agente_ia'
-            )
-        ''', (sug['area'], sug['company'], f"[SUGERIDO] {sug['title']}", sug['description'], sug['priority']))
-
-        from database import last_insert_id
-        task_id = last_insert_id(conn)
-        from email_service import send_agent_suggestion
-        send_agent_suggestion({
-            'id': task_id,
-            'title': f"[SUGERIDO] {sug['title']}",
-            'description': sug['description'],
-            'company': sug['company'],
-            'area': sug['area'],
-            'priority': sug['priority'],
-            'reason': sug['reason']
-        })
-
-    conn.commit()
-    conn.close()
-    print(f"Agente IA generó {len(suggestions)} sugerencias de tareas")
+    print(f"[{datetime.now()}] Agente IA generó sugerencias — pendientes de aprobación del administrador")
+    # Las sugerencias solo se crean cuando el administrador las autoriza manualmente
+    # desde la interfaz. No se auto-crean tareas.
 
 def marketing_suggestion_job():
     print(f"[{datetime.now()}] Agente de Marketing generando sugerencias de diseño...")
