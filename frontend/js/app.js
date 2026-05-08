@@ -900,6 +900,7 @@ let directSocket = null;
 let directOtherId = null;
 let directContacts = [];
 let directFilterText = '';
+let directMessageCache = {};
 
 function initDirectChat() {
     try {
@@ -908,9 +909,11 @@ function initDirectChat() {
             directSocket.emit('join_direct');
         });
         directSocket.on('direct_message', (msg) => {
-            const isRelevant = msg.sender_id === directOtherId || msg.receiver_id === directOtherId;
-            if (isRelevant) {
-                appendDirectMessage(msg);
+            const otherSide = msg.sender_id === user?.id ? msg.receiver_id : msg.sender_id;
+            if (!directMessageCache[otherSide]) directMessageCache[otherSide] = [];
+            directMessageCache[otherSide].push(msg);
+            if (otherSide === directOtherId) {
+                appendDirectMessage(msg, false);
             }
             loadDirectConversations();
             updateDirectBadge();
@@ -1014,28 +1017,43 @@ function selectDirectContact(otherId) {
 }
 
 async function loadDirectMessages(otherId) {
-    const msgs = await fetchAPI(`/direct/messages/${otherId}`);
     const container = document.getElementById('direct-chat-messages');
-    container.innerHTML = '';
+    const contact = directContacts.find(c => c.other_id === otherId);
     document.getElementById('direct-chat-top').style.display = 'block';
     document.getElementById('direct-chat-input-area').style.display = 'flex';
-    const contact = directContacts.find(c => c.other_id === otherId);
     document.getElementById('direct-chat-contact-name').textContent = `${AREA_ICONS[contact?.area_name] || ''} ${contact?.other_name || 'Usuario'}`;
     document.getElementById('direct-chat-placeholder').style.display = 'none';
-    if (!msgs || msgs.length === 0) {
+
+    // Show cached messages instantly if available
+    if (directMessageCache[otherId] && directMessageCache[otherId].length > 0) {
+        container.innerHTML = '';
+        directMessageCache[otherId].forEach(m => appendDirectMessage(m, true));
+        container.scrollTop = container.scrollHeight;
+    } else {
+        container.innerHTML = '<div class="direct-chat-nomsg" style="text-align:center;color:#999;padding:30px;font-size:12px;">💬 Cargando mensajes...</div>';
+    }
+
+    // Fetch fresh messages from server
+    const msgs = await fetchAPI(`/direct/messages/${otherId}`);
+    if (!msgs) return;
+    directMessageCache[otherId] = msgs;
+    container.innerHTML = '';
+    if (msgs.length === 0) {
         container.innerHTML = '<div class="direct-chat-nomsg" style="text-align:center;color:#999;padding:30px;font-size:12px;">💬 Sin mensajes aún. ¡Escribe algo!</div>';
         return;
     }
-    msgs.forEach(m => appendDirectMessage(m));
+    msgs.forEach(m => appendDirectMessage(m, true));
     container.scrollTop = container.scrollHeight;
 }
 
-function appendDirectMessage(msg) {
+function appendDirectMessage(msg, skipPlaceholderRemoval) {
     const container = document.getElementById('direct-chat-messages');
-    const ph = container.querySelector('#direct-chat-placeholder');
-    if (ph) ph.style.display = 'none';
-    const nomsg = container.querySelector('.direct-chat-nomsg');
-    if (nomsg) nomsg.remove();
+    if (!skipPlaceholderRemoval) {
+        const ph = container.querySelector('#direct-chat-placeholder');
+        if (ph) ph.style.display = 'none';
+        const nomsg = container.querySelector('.direct-chat-nomsg');
+        if (nomsg) nomsg.remove();
+    }
     const isMe = msg.sender_id === user?.id;
     const div = document.createElement('div');
     div.className = `direct-msg ${isMe ? 'me' : 'other'}`;
@@ -1056,10 +1074,15 @@ async function sendDirectMessage() {
     if (directSocket && directSocket.connected) {
         directSocket.emit('send_direct_message', { receiver_id: directOtherId, message: msg });
     } else {
-        await fetchAPI('/direct/send', {
+        const result = await fetchAPI('/direct/send', {
             method: 'POST',
             body: JSON.stringify({ receiver_id: directOtherId, message: msg })
         });
+        if (result) {
+            if (!directMessageCache[directOtherId]) directMessageCache[directOtherId] = [];
+            directMessageCache[directOtherId].push(result);
+            appendDirectMessage(result, false);
+        }
     }
 }
 
