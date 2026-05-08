@@ -4,11 +4,18 @@ import json
 import uuid
 import csv
 import io
+import time as _time
 from datetime import datetime, timedelta, date
 from flask import Flask, jsonify, request, send_from_directory, session, redirect, url_for, make_response
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from functools import wraps
+
+os.environ['TZ'] = 'America/Santiago'
+try:
+    _time.tzset()
+except:
+    pass
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 

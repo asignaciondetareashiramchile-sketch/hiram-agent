@@ -319,13 +319,15 @@ async function submitTask() {
     });
 
     if (result) {
-        // Upload files if any
         if (files.length > 0 && result.id) {
+            let uploadOk = true;
             for (let file of files) {
                 const fd = new FormData();
                 fd.append('file', file);
-                await fetch(`${API_BASE}/tasks/${result.id}/attachments`, { method: 'POST', body: fd });
+                const uploadRes = await fetch(`${API_BASE}/tasks/${result.id}/attachments`, { method: 'POST', body: fd, credentials: 'include' });
+                if (!uploadRes.ok) { uploadOk = false; break; }
             }
+            if (!uploadOk) showNotification('⚠️ Tarea creada pero algunos archivos no se pudieron subir', 'warning');
         }
         showNotification(`✅ Tarea asignada a ${areas.find(a => a.id == areaId)?.name || ''}`, 'success');
         closeTaskModal();
@@ -900,18 +902,25 @@ let directContacts = [];
 let directFilterText = '';
 
 function initDirectChat() {
-    directSocket = io({ transports: ['websocket', 'polling'] });
-    directSocket.on('connect', () => {
-        directSocket.emit('join_direct');
-    });
-    directSocket.on('direct_message', (msg) => {
-        const isRelevant = msg.sender_id === directOtherId || msg.receiver_id === directOtherId;
-        if (isRelevant) {
-            appendDirectMessage(msg);
-        }
-        loadDirectConversations();
-        updateDirectBadge();
-    });
+    try {
+        directSocket = io({ transports: ['websocket', 'polling'] });
+        directSocket.on('connect', () => {
+            directSocket.emit('join_direct');
+        });
+        directSocket.on('direct_message', (msg) => {
+            const isRelevant = msg.sender_id === directOtherId || msg.receiver_id === directOtherId;
+            if (isRelevant) {
+                appendDirectMessage(msg);
+            }
+            loadDirectConversations();
+            updateDirectBadge();
+        });
+        directSocket.on('connect_error', (err) => {
+            console.error('Direct chat socket error:', err);
+        });
+    } catch(e) {
+        console.error('Direct chat init error:', e);
+    }
     loadDirectConversations();
     updateDirectBadge();
     if (user?.role === 'area') {
@@ -1014,7 +1023,7 @@ async function loadDirectMessages(otherId) {
     document.getElementById('direct-chat-contact-name').textContent = `${AREA_ICONS[contact?.area_name] || ''} ${contact?.other_name || 'Usuario'}`;
     document.getElementById('direct-chat-placeholder').style.display = 'none';
     if (!msgs || msgs.length === 0) {
-        container.innerHTML = '<div style="text-align:center;color:#999;padding:30px;font-size:12px;">💬 Sin mensajes aún. ¡Escribe algo!</div>';
+        container.innerHTML = '<div class="direct-chat-nomsg" style="text-align:center;color:#999;padding:30px;font-size:12px;">💬 Sin mensajes aún. ¡Escribe algo!</div>';
         return;
     }
     msgs.forEach(m => appendDirectMessage(m));
@@ -1023,10 +1032,10 @@ async function loadDirectMessages(otherId) {
 
 function appendDirectMessage(msg) {
     const container = document.getElementById('direct-chat-messages');
-    const empty = container.querySelector('#direct-chat-placeholder');
-    if (empty) empty.style.display = 'none';
-    const placeholderText = container.querySelector('div[style*="text-align:center"]');
-    if (placeholderText && placeholderText.textContent.includes('Sin mensajes')) placeholderText.remove();
+    const ph = container.querySelector('#direct-chat-placeholder');
+    if (ph) ph.style.display = 'none';
+    const nomsg = container.querySelector('.direct-chat-nomsg');
+    if (nomsg) nomsg.remove();
     const isMe = msg.sender_id === user?.id;
     const div = document.createElement('div');
     div.className = `direct-msg ${isMe ? 'me' : 'other'}`;
@@ -1147,7 +1156,16 @@ loadDashboard = function() {
 const origLoadInitialData = loadInitialData;
 loadInitialData = async function() {
     await origLoadInitialData();
-    setTimeout(initDirectChat, 500);
+    const waitForUser = setInterval(() => {
+        if (user) { clearInterval(waitForUser); initDirectChat(); }
+    }, 200);
+};
+
+// ===== WRAP INIT DIRECT CHAT =====
+const origDirectChatInit = initDirectChat;
+initDirectChat = function() {
+    if (!user) { setTimeout(origDirectChatInit, 300); return; }
+    origDirectChatInit();
 };
 
 // ===== DOCUMENT READY =====
