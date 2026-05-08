@@ -207,6 +207,9 @@ def _get_pg_conn():
     import psycopg2
     conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = False
+    cur = conn.cursor()
+    cur.execute("SET TIME ZONE 'America/Santiago'")
+    cur.close()
     return conn
 
 def last_insert_id(conn):
