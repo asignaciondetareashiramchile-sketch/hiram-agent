@@ -497,9 +497,12 @@ def _init_sqlite():
     for key, value in default_settings:
         conn.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', (key, value))
 
-    for col in ['approved_at', 'approved_by']:
+    for col in ['approved_at', 'approved_by', 'kanban_order', 'template_id']:
         try:
-            conn.execute(f'ALTER TABLE tasks ADD COLUMN {col} TEXT')
+            if col in ('kanban_order',):
+                conn.execute(f'ALTER TABLE tasks ADD COLUMN {col} INTEGER DEFAULT 0')
+            else:
+                conn.execute(f'ALTER TABLE tasks ADD COLUMN {col} TEXT')
         except:
             pass
     try:
@@ -517,26 +520,6 @@ def _init_sqlite():
 def _init_pg():
     conn = get_db()
     cur = conn.cursor()
-
-    # Drop all existing tables to ensure clean schema
-    cur.execute('DROP TABLE IF EXISTS metrics_daily CASCADE')
-    cur.execute('DROP TABLE IF EXISTS session_logs CASCADE')
-    cur.execute('DROP TABLE IF EXISTS notifications CASCADE')
-    cur.execute('DROP TABLE IF EXISTS direct_messages CASCADE')
-    cur.execute('DROP TABLE IF EXISTS area_chat_messages CASCADE')
-    cur.execute('DROP TABLE IF EXISTS chat_messages CASCADE')
-    cur.execute('DROP TABLE IF EXISTS email_logs CASCADE')
-    cur.execute('DROP TABLE IF EXISTS task_followups CASCADE')
-    cur.execute('DROP TABLE IF EXISTS marketing_suggestions CASCADE')
-    cur.execute('DROP TABLE IF EXISTS settings CASCADE')
-    cur.execute('DROP TABLE IF EXISTS agents CASCADE')
-    cur.execute('DROP TABLE IF EXISTS task_templates CASCADE')
-    cur.execute('DROP TABLE IF EXISTS task_logs CASCADE')
-    cur.execute('DROP TABLE IF EXISTS task_attachments CASCADE')
-    cur.execute('DROP TABLE IF EXISTS tasks CASCADE')
-    cur.execute('DROP TABLE IF EXISTS users CASCADE')
-    cur.execute('DROP TABLE IF EXISTS companies CASCADE')
-    cur.execute('DROP TABLE IF EXISTS areas CASCADE')
 
     tables = [
         '''
@@ -733,6 +716,22 @@ def _init_pg():
     ]
     for key, value in settings:
         cur.execute('INSERT INTO settings (key, value) VALUES (%s,%s) ON CONFLICT (key) DO NOTHING', (key, value))
+
+    # Schema migrations: add missing columns safely
+    migraciones = [
+        "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP",
+        "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS approved_by TEXT",
+        "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS kanban_order INTEGER DEFAULT 0",
+        "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS template_id INTEGER",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP",
+        "ALTER TABLE area_chat_messages ADD COLUMN IF NOT EXISTS urgency_color TEXT DEFAULT '#FFC107'",
+    ]
+    for m in migraciones:
+        try:
+            cur.execute(m)
+        except Exception:
+            pass
 
     try:
         cur.execute('CREATE INDEX IF NOT EXISTS idx_tasks_search ON tasks(title, description)')
