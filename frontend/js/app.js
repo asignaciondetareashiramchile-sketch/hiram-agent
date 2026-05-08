@@ -10,7 +10,7 @@ const PRIORITIES = {
 const AREA_ICONS = {
     'RRHH': '👥', 'ASISTENTE RRHH': '🤝', 'FINANZAS': '💰', 'VENTAS': '📈',
     'ADMINISTRACION DE CONTRATOS': '📋', 'ADMINISTRACIÓN GENERAL': '🏢',
-    'MARKETING': '📢', 'ATENCION AL CLIENTE': '🎧'
+    'MARKETING': '📢', 'ATENCION AL CLIENTE': '🎧', 'LOGÍSTICA': '🚚'
 };
 
 const COMPANY_COLORS = {
@@ -893,124 +893,193 @@ async function runRecurring() {
     if (result) showNotification(`🔄 ${result.created} tareas recurrentes creadas`, 'success');
 }
 
-// ===== AREA CHAT =====
-let areaChatSocket = null;
-let currentChatAreaId = null;
-let chatUrgencyColor = '#FFC107';
-let areaChatMessages = {};
+// ===== DIRECT CHAT (Usuario a Admin) =====
+let directSocket = null;
+let directOtherId = null;
+let directContacts = [];
+let directFilterText = '';
 
-function initAreaChat() {
-    areaChatSocket = io({ transports: ['websocket', 'polling'] });
-    areaChatSocket.on('area_chat_message', (msg) => {
-        if (msg.area_id == currentChatAreaId) {
-            appendChatMessage(msg);
+function initDirectChat() {
+    directSocket = io({ transports: ['websocket', 'polling'] });
+    directSocket.on('connect', () => {
+        directSocket.emit('join_direct');
+    });
+    directSocket.on('direct_message', (msg) => {
+        const isRelevant = msg.sender_id === directOtherId || msg.receiver_id === directOtherId;
+        if (isRelevant) {
+            appendDirectMessage(msg);
         }
-        // Update badge count for non-active chats
-        updateChatBadge();
+        loadDirectConversations();
+        updateDirectBadge();
     });
-    loadChatAreas();
-}
-
-function loadChatAreas() {
-    const sel = document.getElementById('area-chat-select');
-    const companySel = document.getElementById('area-chat-company');
-    sel.innerHTML = '<option value="">Seleccionar área...</option>';
-    areas.forEach(a => {
-        const opt = document.createElement('option');
-        opt.value = a.id; opt.textContent = `${AREA_ICONS[a.name] || '📋'} ${a.name}`;
-        sel.appendChild(opt);
-    });
-    // If area user, auto-select their area
-    if (user?.role === 'area' && user?.area_id) {
-        sel.value = user.area_id;
-        switchAreaChat();
+    loadDirectConversations();
+    updateDirectBadge();
+    if (user?.role === 'area') {
+        selectDirectContact(1);
     }
-    companySel.innerHTML = '<option value="">Empresa...</option>';
-    companies.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.id; opt.textContent = c.name;
-        companySel.appendChild(opt);
-    });
+    setInterval(updateDirectBadge, 15000);
 }
 
-function toggleAreaChat() {
-    const panel = document.getElementById('area-chat-panel');
-    panel.classList.toggle('open');
-    if (panel.classList.contains('open') && currentChatAreaId) {
-        setTimeout(() => {
-            document.getElementById('area-chat-messages').scrollTop = 99999;
-        }, 100);
+async function loadDirectConversations() {
+    if (!user) return;
+    const data = await fetchAPI('/direct/conversations') || [];
+    if (user.role !== 'area') {
+        const allUsers = await fetchAPI('/users') || [];
+        const existingIds = new Set(data.map(c => c.other_id));
+        allUsers.forEach(u => {
+            if (u.id !== user.id && !existingIds.has(u.id)) {
+                data.push({
+                    other_id: u.id,
+                    other_name: u.name || u.username,
+                    other_role: u.role,
+                    other_area_id: u.area_id,
+                    area_name: u.area_name || '',
+                    area_color: null,
+                    last_message: null,
+                    last_time: null,
+                    unread: 0
+                });
+            }
+        });
+    } else {
+        if (data.length === 0) {
+            data.push({
+                other_id: 1,
+                other_name: 'Administrador',
+                other_role: 'superadmin',
+                other_area_id: null,
+                area_name: '',
+                area_color: null,
+                last_message: null,
+                last_time: null,
+                unread: 0
+            });
+        }
+    }
+    directContacts = data;
+    renderDirectContacts();
+    if (!directOtherId && data.length > 0) {
+        selectDirectContact(data[0].other_id);
     }
 }
 
-function switchAreaChat() {
-    const sel = document.getElementById('area-chat-select');
-    const aid = parseInt(sel.value);
-    if (!aid) return;
-    currentChatAreaId = aid;
-    if (areaChatSocket) {
-        areaChatSocket.emit('leave_area_chat', { area_id: aid });
-        areaChatSocket.emit('join_area_chat', { area_id: aid });
-    }
-    loadAreaChatMessages(aid);
-}
-
-async function loadAreaChatMessages(areaId) {
-    const msgs = await fetchAPI(`/area-chat/${areaId}`);
-    const container = document.getElementById('area-chat-messages');
+function renderDirectContacts() {
+    const container = document.getElementById('direct-chat-contacts');
     container.innerHTML = '';
-    if (!msgs || msgs.length === 0) {
-        container.innerHTML = '<div style="text-align:center;color:#999;padding:40px;font-size:13px;">💬 No hay mensajes aún. ¡Empieza a chatear!</div>';
+    const filtered = directContacts.filter(c => {
+        if (!directFilterText) return true;
+        return (c.other_name || '').toLowerCase().includes(directFilterText.toLowerCase());
+    });
+    if (filtered.length === 0) {
+        container.innerHTML = '<div style="text-align:center;color:#999;padding:20px;font-size:11px;">Sin conversaciones</div>';
         return;
     }
-    areaChatMessages[areaId] = msgs;
-    msgs.forEach(m => appendChatMessage(m));
+    filtered.forEach(c => {
+        const div = document.createElement('div');
+        div.className = `direct-contact${c.other_id === directOtherId ? ' active' : ''}`;
+        const dotColor = c.area_color || '#999';
+        div.innerHTML = `
+            <span class="contact-dot" style="background:${dotColor}"></span>
+            <span class="contact-name">${AREA_ICONS[c.area_name] || ''} ${c.other_name || 'Usuario'}</span>
+            ${c.unread > 0 ? `<span class="contact-unread">${c.unread}</span>` : ''}`;
+        div.onclick = () => selectDirectContact(c.other_id);
+        container.appendChild(div);
+    });
+}
+
+function filterDirectConversations(text) {
+    directFilterText = text;
+    renderDirectContacts();
+}
+
+function selectDirectContact(otherId) {
+    directOtherId = otherId;
+    document.querySelectorAll('.direct-contact').forEach(el => el.classList.remove('active'));
+    const contacts = document.getElementById('direct-chat-contacts');
+    const items = contacts.querySelectorAll('.direct-contact');
+    items.forEach((item, idx) => {
+        const c = directContacts.filter(d => !directFilterText || (d.other_name || '').toLowerCase().includes(directFilterText.toLowerCase()))[idx];
+        if (c && c.other_id === otherId) item.classList.add('active');
+    });
+    loadDirectMessages(otherId);
+}
+
+async function loadDirectMessages(otherId) {
+    const msgs = await fetchAPI(`/direct/messages/${otherId}`);
+    const container = document.getElementById('direct-chat-messages');
+    container.innerHTML = '';
+    document.getElementById('direct-chat-top').style.display = 'block';
+    document.getElementById('direct-chat-input-area').style.display = 'flex';
+    const contact = directContacts.find(c => c.other_id === otherId);
+    document.getElementById('direct-chat-contact-name').textContent = `${AREA_ICONS[contact?.area_name] || ''} ${contact?.other_name || 'Usuario'}`;
+    document.getElementById('direct-chat-placeholder').style.display = 'none';
+    if (!msgs || msgs.length === 0) {
+        container.innerHTML = '<div style="text-align:center;color:#999;padding:30px;font-size:12px;">💬 Sin mensajes aún. ¡Escribe algo!</div>';
+        return;
+    }
+    msgs.forEach(m => appendDirectMessage(m));
     container.scrollTop = container.scrollHeight;
 }
 
-function appendChatMessage(msg) {
-    const container = document.getElementById('area-chat-messages');
-    const empty = container.querySelector('#area-chat-empty');
-    if (empty) empty.remove();
-    const isMe = msg.user_id === user?.id || msg.username === user?.name || msg.username === user?.username;
+function appendDirectMessage(msg) {
+    const container = document.getElementById('direct-chat-messages');
+    const empty = container.querySelector('#direct-chat-placeholder');
+    if (empty) empty.style.display = 'none';
+    const placeholderText = container.querySelector('div[style*="text-align:center"]');
+    if (placeholderText && placeholderText.textContent.includes('Sin mensajes')) placeholderText.remove();
+    const isMe = msg.sender_id === user?.id;
     const div = document.createElement('div');
-    div.className = `chat-msg ${isMe ? 'me' : 'other'}`;
+    div.className = `direct-msg ${isMe ? 'me' : 'other'}`;
     const time = msg.created_at ? new Date(msg.created_at + (msg.created_at.includes('T') ? '' : 'T00:00:00')).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
     div.innerHTML = `
-        ${!isMe ? `<div class="msg-user"><span class="urgency-dot" style="background:${msg.urgency_color||'#FFC107'}"></span>${msg.username || msg.user_name || 'Usuario'}</div>` : ''}
+        ${!isMe ? `<div class="msg-user">${msg.sender_name || 'Usuario'}</div>` : ''}
         ${msg.message}
         <div class="msg-time">${time}</div>`;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
 
-function selectChatUrgency(el) {
-    document.querySelectorAll('#area-chat-urgency button').forEach(b => b.classList.remove('selected'));
-    el.classList.add('selected');
-    chatUrgencyColor = el.dataset.color;
-}
-
-async function sendAreaChat() {
-    const input = document.getElementById('area-chat-input');
-    const companySel = document.getElementById('area-chat-company');
+async function sendDirectMessage() {
+    const input = document.getElementById('direct-chat-input');
     const msg = input.value.trim();
-    const companyId = parseInt(companySel.value);
-    if (!currentChatAreaId) { showNotification('Selecciona un área primero', 'error'); return; }
-    if (!msg) { showNotification('Escribe un mensaje', 'error'); return; }
-    if (!companyId) { showNotification('Selecciona una empresa', 'error'); return; }
+    if (!msg || !directOtherId) return;
     input.value = '';
-    const result = await fetchAPI(`/area-chat/${currentChatAreaId}`, {
-        method: 'POST',
-        body: JSON.stringify({ message: msg, company_id: companyId, urgency_color: chatUrgencyColor })
-    });
-    if (!result) showNotification('Error al enviar mensaje', 'error');
+    if (directSocket && directSocket.connected) {
+        directSocket.emit('send_direct_message', { receiver_id: directOtherId, message: msg });
+    } else {
+        await fetchAPI('/direct/send', {
+            method: 'POST',
+            body: JSON.stringify({ receiver_id: directOtherId, message: msg })
+        });
+    }
 }
 
-function updateChatBadge() {
-    const badge = document.getElementById('area-chat-badge');
-    // Simple badge logic - could track unread per area
-    badge.style.display = 'none';
+function toggleDirectChat() {
+    const panel = document.getElementById('direct-chat-panel');
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) {
+        loadDirectConversations();
+        updateDirectBadge();
+        if (directOtherId) {
+            setTimeout(() => {
+                document.getElementById('direct-chat-messages').scrollTop = 99999;
+            }, 100);
+        }
+    }
 }
+
+async function updateDirectBadge() {
+    if (!user) return;
+    const data = await fetchAPI('/direct/unread-count');
+    const badge = document.getElementById('direct-chat-badge');
+    if (data && data.count > 0) {
+        badge.textContent = data.count;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
 
 // ===== MARKETING IDEAS =====
 async function loadMarketingIdeas() {
@@ -1078,7 +1147,7 @@ loadDashboard = function() {
 const origLoadInitialData = loadInitialData;
 loadInitialData = async function() {
     await origLoadInitialData();
-    setTimeout(initAreaChat, 500);
+    setTimeout(initDirectChat, 500);
 };
 
 // ===== DOCUMENT READY =====

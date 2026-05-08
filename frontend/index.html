@@ -291,35 +291,33 @@
         </div>
     </div>
 
-    <!-- Floating Area Chat Widget -->
-    <button id="area-chat-toggle" onclick="toggleAreaChat()" title="Chat por área">
-        💬 <span class="badge" id="area-chat-badge" style="display:none;">0</span>
+    <!-- Floating Direct Chat Widget -->
+    <button id="direct-chat-toggle" onclick="toggleDirectChat()" title="Chat directo">
+        💬 <span class="badge" id="direct-chat-badge" style="display:none;">0</span>
     </button>
-    <div id="area-chat-panel">
-        <div class="area-chat-header">
-            <select id="area-chat-select" onchange="switchAreaChat()">
-                <option value="">Seleccionar área...</option>
-            </select>
-            <button class="close-chat" onclick="toggleAreaChat()">&times;</button>
+    <div id="direct-chat-panel">
+        <div class="direct-chat-header">
+            <span>💬 Chat Directo</span>
+            <button class="close-chat" onclick="toggleDirectChat()">&times;</button>
         </div>
-        <div id="area-chat-messages">
-            <div style="text-align:center;color:#999;padding:40px;font-size:13px;" id="area-chat-empty">
-                💬 Selecciona un área para iniciar el chat
+        <div id="direct-chat-body">
+            <div id="direct-chat-sidebar">
+                <div id="direct-chat-search"><input type="text" id="direct-chat-filter" placeholder="Buscar contacto..." oninput="filterDirectConversations(this.value)"></div>
+                <div id="direct-chat-contacts"></div>
             </div>
-        </div>
-        <div class="area-chat-footer">
-            <div class="chat-controls">
-                <select id="area-chat-company"><option value="">Empresa...</option></select>
-                <div class="urgency-picker" id="area-chat-urgency">
-                    <button style="background:#7B2D8E;" data-color="#7B2D8E" onclick="selectChatUrgency(this)"></button>
-                    <button style="background:#DC3545;" data-color="#DC3545" onclick="selectChatUrgency(this)"></button>
-                    <button style="background:#FFC107;" data-color="#FFC107" onclick="selectChatUrgency(this)" class="selected"></button>
-                    <button style="background:#28A745;" data-color="#28A745" onclick="selectChatUrgency(this)"></button>
+            <div id="direct-chat-main">
+                <div id="direct-chat-top" style="display:none;">
+                    <span id="direct-chat-contact-name"></span>
                 </div>
-            </div>
-            <div class="chat-input-row">
-                <input type="text" id="area-chat-input" placeholder="Escribe un mensaje..." onkeydown="if(event.key==='Enter')sendAreaChat()">
-                <button onclick="sendAreaChat()">Enviar</button>
+                <div id="direct-chat-messages">
+                    <div style="text-align:center;color:#999;padding:40px;font-size:13px;" id="direct-chat-placeholder">
+                        💬 Selecciona un contacto para chatear
+                    </div>
+                </div>
+                <div id="direct-chat-input-area" style="display:none;">
+                    <input type="text" id="direct-chat-input" placeholder="Escribe un mensaje..." onkeydown="if(event.key==='Enter')sendDirectMessage()">
+                    <button onclick="sendDirectMessage()">Enviar</button>
+                </div>
             </div>
         </div>
     </div>

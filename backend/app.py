@@ -1144,6 +1144,112 @@ def handle_leave_area_chat(data):
     room = f"area_chat_{data.get('area_id')}"
     leave_room(room)
 
+# ===== DIRECT CHAT (Usuario a Admin) =====
+
+@app.route('/api/direct/conversations')
+@login_required
+def get_direct_conversations():
+    uid = session['user_id']
+    conn = get_db()
+    rows = conn.execute('''
+        SELECT DISTINCT
+            CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS other_id,
+            u.name AS other_name, u.role AS other_role, u.area_id AS other_area_id,
+            a.name AS area_name, a.color AS area_color,
+            (SELECT message FROM direct_messages WHERE (sender_id = ? AND receiver_id = u.id) OR (sender_id = u.id AND receiver_id = ?) ORDER BY created_at DESC LIMIT 1) AS last_message,
+            (SELECT created_at FROM direct_messages WHERE (sender_id = ? AND receiver_id = u.id) OR (sender_id = u.id AND receiver_id = ?) ORDER BY created_at DESC LIMIT 1) AS last_time,
+            (SELECT COUNT(*) FROM direct_messages WHERE receiver_id = ? AND sender_id = u.id AND is_read = 0) AS unread
+        FROM direct_messages dm
+        JOIN users u ON u.id = CASE WHEN dm.sender_id = ? THEN dm.receiver_id ELSE dm.sender_id END
+        LEFT JOIN areas a ON u.area_id = a.id
+        WHERE dm.sender_id = ? OR dm.receiver_id = ?
+        ORDER BY last_time DESC
+    ''', (uid, uid, uid, uid, uid, uid, uid, uid, uid)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/direct/messages/<int:other_id>')
+@login_required
+def get_direct_messages(other_id):
+    uid = session['user_id']
+    conn = get_db()
+    msgs = conn.execute('''
+        SELECT dm.*, u.name AS sender_name
+        FROM direct_messages dm
+        LEFT JOIN users u ON dm.sender_id = u.id
+        WHERE (dm.sender_id = ? AND dm.receiver_id = ?) OR (dm.sender_id = ? AND dm.receiver_id = ?)
+        ORDER BY dm.created_at ASC
+    ''', (uid, other_id, other_id, uid)).fetchall()
+    conn.execute('UPDATE direct_messages SET is_read = 1 WHERE sender_id = ? AND receiver_id = ? AND is_read = 0',
+                (other_id, uid))
+    conn.commit()
+    conn.close()
+    return jsonify([dict(m) for m in msgs])
+
+@app.route('/api/direct/send', methods=['POST'])
+@login_required
+def send_direct_message():
+    data = request.json
+    receiver_id = data.get('receiver_id')
+    message = data.get('message', '').strip()
+    if not receiver_id or not message:
+        return jsonify({'error': 'receiver_id y message requeridos'}), 400
+    uid = session['user_id']
+    conn = get_db()
+    conn.execute('INSERT INTO direct_messages (sender_id, receiver_id, message) VALUES (?, ?, ?)',
+                (uid, receiver_id, message))
+    conn.commit()
+    msg_id = last_insert_id(conn)
+    msg = conn.execute('''
+        SELECT dm.*, u.name AS sender_name
+        FROM direct_messages dm
+        LEFT JOIN users u ON dm.sender_id = u.id
+        WHERE dm.id = ?
+    ''', (msg_id,)).fetchone()
+    conn.close()
+    socketio.emit('direct_message', dict(msg), room=f'user_{receiver_id}')
+    socketio.emit('direct_message', dict(msg), room=f'user_{uid}')
+    return jsonify(dict(msg)), 201
+
+@app.route('/api/direct/unread-count')
+@login_required
+def direct_unread_count():
+    uid = session['user_id']
+    conn = get_db()
+    count = conn.execute('SELECT COUNT(*) AS c FROM direct_messages WHERE receiver_id = ? AND is_read = 0',
+                        (uid,)).fetchone()['c']
+    conn.close()
+    return jsonify({'count': count})
+
+@socketio.on('join_direct')
+def handle_join_direct():
+    if 'user_id' in session:
+        join_room(f'user_{session["user_id"]}')
+
+@socketio.on('send_direct_message')
+def handle_send_direct(data):
+    if 'user_id' not in session:
+        return
+    receiver_id = data.get('receiver_id')
+    message = data.get('message', '').strip()
+    if not receiver_id or not message:
+        return
+    uid = session['user_id']
+    conn = get_db()
+    conn.execute('INSERT INTO direct_messages (sender_id, receiver_id, message) VALUES (?, ?, ?)',
+                (uid, receiver_id, message))
+    conn.commit()
+    msg_id = last_insert_id(conn)
+    msg = conn.execute('''
+        SELECT dm.*, u.name AS sender_name
+        FROM direct_messages dm
+        LEFT JOIN users u ON dm.sender_id = u.id
+        WHERE dm.id = ?
+    ''', (msg_id,)).fetchone()
+    conn.close()
+    socketio.emit('direct_message', dict(msg), room=f'user_{receiver_id}')
+    socketio.emit('direct_message', dict(msg), room=f'user_{uid}')
+
 # ===== BÚSQUEDA GLOBAL =====
 
 @app.route('/api/search')

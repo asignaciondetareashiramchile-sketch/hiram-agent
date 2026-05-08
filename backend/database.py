@@ -368,6 +368,16 @@ def _init_sqlite():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS direct_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id INTEGER NOT NULL,
+            receiver_id INTEGER NOT NULL,
+            message TEXT NOT NULL,
+            is_read INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (sender_id) REFERENCES users(id),
+            FOREIGN KEY (receiver_id) REFERENCES users(id)
+        );
         CREATE TABLE IF NOT EXISTS area_chat_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             area_id INTEGER NOT NULL,
@@ -509,6 +519,7 @@ def _init_pg():
     cur.execute('DROP TABLE IF EXISTS metrics_daily CASCADE')
     cur.execute('DROP TABLE IF EXISTS session_logs CASCADE')
     cur.execute('DROP TABLE IF EXISTS notifications CASCADE')
+    cur.execute('DROP TABLE IF EXISTS direct_messages CASCADE')
     cur.execute('DROP TABLE IF EXISTS area_chat_messages CASCADE')
     cur.execute('DROP TABLE IF EXISTS chat_messages CASCADE')
     cur.execute('DROP TABLE IF EXISTS email_logs CASCADE')
@@ -613,6 +624,12 @@ def _init_pg():
             id SERIAL PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
             user_id INTEGER NOT NULL REFERENCES users(id), username TEXT NOT NULL,
             message TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''',
+        '''
+        CREATE TABLE IF NOT EXISTS direct_messages (
+            id SERIAL PRIMARY KEY, sender_id INTEGER NOT NULL REFERENCES users(id),
+            receiver_id INTEGER NOT NULL REFERENCES users(id), message TEXT NOT NULL,
+            is_read INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )''',
         '''
         CREATE TABLE IF NOT EXISTS area_chat_messages (
